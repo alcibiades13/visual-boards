@@ -23,7 +23,12 @@ export function Dashboard() {
     <div className="mx-auto flex min-h-full max-w-6xl flex-col px-4 sm:px-8">
       <header className="flex items-center justify-between py-5">
         <span className="font-serif text-lg tracking-tight">{t('app.name')}</span>
-        <LocaleSwitch />
+        <nav className="flex items-center gap-4">
+          <a href={hrefFor({ name: 'library' })} className="text-muted transition-colors hover:text-ink">
+            {t('nav.library')}
+          </a>
+          <LocaleSwitch />
+        </nav>
       </header>
 
       <main className="flex flex-1 flex-col pb-16">

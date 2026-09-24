@@ -7,6 +7,8 @@ describe('router', () => {
     expect(parseHash('#/')).toEqual({ name: 'dashboard' });
     expect(parseHash('#/b/abc_1')).toEqual({ name: 'board', boardId: 'abc_1' });
     expect(parseHash('#/nope')).toEqual({ name: 'dashboard' });
+    expect(parseHash('#/library')).toEqual({ name: 'library' });
+    expect(parseHash(hrefFor({ name: 'library' }))).toEqual({ name: 'library' });
   });
 
   it('round-trips board links', () => {

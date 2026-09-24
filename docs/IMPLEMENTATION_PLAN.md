@@ -45,7 +45,7 @@ Pravila koja se proveravaju u code review-u: komponente uvoze samo iz `data/repo
 1. HEIC detekcija (magic bytes `ftypheic/heix/mif1`) → `heic2any` (lazy import u main thread-u, jer heic2any zahteva DOM),
 2. `createImageBitmap(blob, { imageOrientation: 'from-image' })`,
 3. `OffscreenCanvas` resize na max 2400px → `convertToBlob({ type: 'image/webp', quality: 0.85 })` (JPEG fallback ako browser vrati PNG),
-4. thumbnail 480px,
+4. thumbnail 640px (vidi DECISIONS.md),
 5. SHA-256 (`crypto.subtle.digest`) nad originalnim bajtovima → hash.
 
 Pool od 4 workera, red zadataka, `AbortController` za otkazivanje, callback po završenoj slici → upis u bazu → thumbnail odmah vidljiv. Traka napretka „37/120“.

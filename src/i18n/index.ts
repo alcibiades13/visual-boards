@@ -25,8 +25,23 @@ export const useLocale = create<LocaleState>((set) => ({
   },
 }));
 
+// Plural categories in the order the "|"-separated forms are written.
+const PLURAL_ORDER: Record<Locale, Intl.LDMLPluralRule[]> = {
+  en: ['one', 'other'],
+  sr: ['one', 'few', 'other'],
+};
+const pluralRules = new Map<Locale, Intl.PluralRules>();
+
+function pickPlural(locale: Locale, forms: string[], count: number): string {
+  let rules = pluralRules.get(locale);
+  if (!rules) pluralRules.set(locale, (rules = new Intl.PluralRules(locale)));
+  const index = PLURAL_ORDER[locale].indexOf(rules.select(count));
+  return forms[index] ?? forms[forms.length - 1]!;
+}
+
 export function translate(locale: Locale, key: MessageKey, vars?: Record<string, string | number>): string {
   let text: string = catalogs[locale][key];
+  if (typeof vars?.count === 'number' && text.includes('{count}') && text.includes('|')) text = pickPlural(locale, text.split('|'), vars.count);
   if (vars) for (const [k, v] of Object.entries(vars)) text = text.replaceAll(`{${k}}`, String(v));
   return text;
 }

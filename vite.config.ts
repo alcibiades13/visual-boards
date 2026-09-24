@@ -10,6 +10,8 @@ export default defineConfig({
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
   worker: { format: 'es' },
+  // heic2any (~1.3MB) is a lazy chunk loaded only for HEIC files.
+  build: { chunkSizeWarningLimit: 1400 },
   test: {
     include: ['src/**/*.test.ts'],
     environment: 'node',
