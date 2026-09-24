@@ -5,9 +5,10 @@ import { useT } from '@/i18n';
 import { useBoard } from '@/store/boardStore';
 import { LIBRARY_MAX_WIDTH, LIBRARY_MIN_WIDTH, useEditor } from '@/store/editorStore';
 import { useIntake } from '@/store/intakeStore';
-import { ArrowLeftIcon, CloseIcon, SidebarIcon, SlidersIcon } from '@/ui/icons';
+import { ArrowLeftIcon, CloseIcon, SidebarIcon, SlidersIcon, TextIcon } from '@/ui/icons';
+import { Segmented } from '@/ui/Segmented';
 import { DESKTOP, useMediaQuery } from '@/ui/useMediaQuery';
-import { uploadToBoard } from './actions';
+import { addTextCard, uploadToBoard } from './actions';
 import { EditorDnd } from './EditorDnd';
 import { Inspector } from './Inspector';
 import { Wall } from './Wall';
@@ -66,6 +67,8 @@ function Editor() {
   const libraryOpen = useEditor((s) => s.libraryOpen);
   const libraryWidth = useEditor((s) => s.libraryWidth);
   const settingsOpen = useEditor((s) => s.settingsOpen);
+  const mode = useEditor((s) => s.mode);
+  const editing = mode === 'edit';
   const fileInput = useRef<HTMLInputElement>(null);
   const setEditor = useEditor((s) => s.set);
 
@@ -108,33 +111,57 @@ function Editor() {
           <div className="min-w-0 flex-1">
             <BoardTitle />
           </div>
-          <button
-            type="button"
-            aria-pressed={libraryOpen}
-            aria-label={t('editor.library')}
-            onClick={() => setEditor({ libraryOpen: !libraryOpen, settingsOpen: false })}
-            className="flex h-9 items-center gap-1.5 rounded-md px-2.5 text-muted hover:bg-surface-2 hover:text-ink aria-pressed:text-ink"
-            title={desktop && libraryOpen ? t('editor.hideLibrary') : t('editor.library')}
-          >
-            <SidebarIcon size={17} />
-            <span className="hidden sm:inline">{t('editor.library')}</span>
-          </button>
-          {!desktop && (
-            <button
-              type="button"
-              aria-pressed={settingsOpen}
-              aria-label={t('editor.settings')}
-              onClick={() => setEditor({ settingsOpen: !settingsOpen, libraryOpen: false })}
-              className="flex h-9 items-center gap-1.5 rounded-md px-2.5 text-muted hover:bg-surface-2 hover:text-ink aria-pressed:text-ink"
-            >
-              <SlidersIcon size={17} />
-              <span className="hidden sm:inline">{t('editor.settings')}</span>
-            </button>
+          <Segmented
+            label={t('editor.mode')}
+            value={mode}
+            onChange={(m) => useEditor.getState().setMode(m)}
+            options={[
+              ['edit', t('editor.edit')],
+              ['view', t('editor.view')],
+            ]}
+          />
+          {editing && (
+            <>
+              <button
+                type="button"
+                aria-label={t('editor.addTextLong')}
+                title={t('editor.addTextLong')}
+                onClick={() => addTextCard(t('card.newText'))}
+                className="flex h-9 items-center gap-1.5 rounded-md px-2.5 text-muted hover:bg-surface-2 hover:text-ink"
+              >
+                <TextIcon size={17} />
+                <span className="hidden md:inline">{t('editor.addText')}</span>
+              </button>
+              <button
+                type="button"
+                aria-pressed={libraryOpen}
+                aria-label={t('editor.library')}
+                onClick={() => setEditor({ libraryOpen: !libraryOpen, settingsOpen: false })}
+                className="flex h-9 items-center gap-1.5 rounded-md px-2.5 text-muted hover:bg-surface-2 hover:text-ink aria-pressed:text-ink"
+                title={desktop && libraryOpen ? t('editor.hideLibrary') : t('editor.library')}
+              >
+                <SidebarIcon size={17} />
+                <span className="hidden md:inline">{t('editor.library')}</span>
+              </button>
+              {!desktop && (
+                <button
+                  type="button"
+                  aria-pressed={settingsOpen}
+                  aria-label={t('editor.settings')}
+                  onClick={() => setEditor({ settingsOpen: !settingsOpen, libraryOpen: false })}
+                  className="flex h-9 items-center gap-1.5 rounded-md px-2.5 text-muted hover:bg-surface-2 hover:text-ink aria-pressed:text-ink"
+                >
+                  <SlidersIcon size={17} />
+                  <span className="hidden md:inline">{t('editor.settings')}</span>
+                </button>
+              )}
+            </>
           )}
         </header>
 
         <div className="relative flex min-h-0 flex-1">
-          {libraryOpen &&
+          {editing &&
+            libraryOpen &&
             (desktop ? (
               <>
                 <aside className="flex min-h-0 shrink-0 flex-col bg-bg px-3 pt-2" style={{ width: libraryWidth }}>
@@ -166,7 +193,7 @@ function Editor() {
             <Wall onUploadRequest={() => fileInput.current?.click()} />
           </main>
 
-          {desktop ? (
+          {!editing ? null : desktop ? (
             <aside className="w-[280px] shrink-0 overflow-y-auto border-l border-line bg-bg" aria-label={t('editor.settings')}>
               <Inspector />
             </aside>

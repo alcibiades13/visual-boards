@@ -1,5 +1,5 @@
 import { createLayoutState, newId } from './defaults';
-import type { Board, BoardItem, ID, LayoutId, LayoutParamsMap, LayoutState } from './types';
+import type { Board, BoardItem, Face, FocalPoint, ID, ItemStyle, LayoutId, LayoutParamsMap, LayoutState, TextOverlay, TextStyle } from './types';
 
 // Board edits as plain mutations. They run inside boardStore.update() on an
 // Immer draft, and in tests on produce(). Content order lives in board.items;
@@ -98,4 +98,81 @@ export function moveSection(board: Board, id: ID, delta: -1 | 1): void {
   if (from < 0 || to < 0 || to >= board.sections.length) return;
   const [section] = board.sections.splice(from, 1);
   board.sections.splice(to, 0, section!);
+}
+
+// ---------- Card content and style (M4) ----------
+
+function eachItem(board: Board, ids: ID[], fn: (item: BoardItem) => void): void {
+  const set = new Set(ids);
+  for (const item of board.items) if (set.has(item.id)) fn(item);
+}
+
+/** Puts text over an image card (quote from the library or local text). */
+export function setOverlay(board: Board, id: ID, overlay: TextOverlay): void {
+  eachItem(board, [id], (item) => {
+    if (item.front.kind === 'image') item.front.overlay = overlay;
+  });
+}
+
+export function updateOverlay(board: Board, id: ID, patch: Partial<TextOverlay>): void {
+  eachItem(board, [id], (item) => {
+    if (item.front.kind === 'image' && item.front.overlay) Object.assign(item.front.overlay, patch);
+  });
+}
+
+/** Back to a plain image; the quote stays in the library. */
+export function removeOverlay(board: Board, id: ID): void {
+  eachItem(board, [id], (item) => {
+    if (item.front.kind === 'image') delete item.front.overlay;
+  });
+}
+
+/** A back face makes the card a flip card. */
+export function setBack(board: Board, id: ID, back: Face): void {
+  eachItem(board, [id], (item) => void (item.back = back));
+}
+
+export function removeBack(board: Board, id: ID): void {
+  eachItem(board, [id], (item) => void delete item.back);
+}
+
+export function setCaption(board: Board, id: ID, caption: string): void {
+  eachItem(board, [id], (item) => {
+    if (caption) item.caption = caption;
+    else delete item.caption;
+  });
+}
+
+export function setItemStyle(board: Board, ids: ID[], patch: Partial<ItemStyle>): void {
+  eachItem(board, ids, (item) => {
+    Object.assign(item.style, patch);
+    if ('border' in patch && !patch.border) delete item.style.border;
+  });
+}
+
+export function setFocal(board: Board, id: ID, focal: FocalPoint): void {
+  eachItem(board, [id], (item) => {
+    if (item.front.kind === 'image') item.front.focal = focal;
+  });
+}
+
+/** Text of a local text face (front or back). */
+export function setFaceText(board: Board, id: ID, side: 'front' | 'back', text: string): void {
+  eachItem(board, [id], (item) => {
+    const face = item[side];
+    if (face?.kind === 'text') face.text = text;
+  });
+}
+
+/** Text style of a text or quote face, or of an image's overlay. */
+export function setTextStyle(board: Board, ids: ID[], side: 'front' | 'back', patch: Partial<TextStyle>, base: TextStyle): void {
+  eachItem(board, ids, (item) => {
+    const face = item[side];
+    if (!face) return;
+    if (face.kind === 'image') {
+      if (face.overlay) face.overlay.textStyle = { ...base, ...face.overlay.textStyle, ...patch };
+    } else {
+      face.textStyle = { ...base, ...face.textStyle, ...patch };
+    }
+  });
 }

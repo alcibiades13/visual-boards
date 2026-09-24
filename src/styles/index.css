@@ -45,3 +45,41 @@
     cursor: pointer;
   }
 }
+
+/* Flip cards (blueprint §6): 3D rotation, or a short crossfade with reduced motion. */
+@layer components {
+  .vb-flipper {
+    transform-style: preserve-3d;
+    transition: transform 450ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .vb-flipper[data-flipped] {
+    transform: rotateY(180deg);
+  }
+  .vb-face {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+  .vb-face-back {
+    transform: rotateY(180deg);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .vb-flipper,
+    .vb-flipper[data-flipped] {
+      transition: none;
+      transform: none;
+    }
+    .vb-face {
+      transition: opacity 180ms ease;
+    }
+    .vb-face-back {
+      transform: none;
+      opacity: 0;
+    }
+    .vb-flipper[data-flipped] .vb-face-front {
+      opacity: 0;
+    }
+    .vb-flipper[data-flipped] .vb-face-back {
+      opacity: 1;
+    }
+  }
+}

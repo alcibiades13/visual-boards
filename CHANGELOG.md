@@ -1,5 +1,16 @@
 # Changelog
 
+## M4 — Cards (2026-09-24)
+
+- One `<Card>` renders images, quotes, text, text over images, flip cards (any two faces) and captions.
+- Text over images: 9 positions on a visual grid, 7 readability effects with intensity, auto text size within 60% of the image with a "too long" warning.
+- Flip cards: 3D flip (crossfade with reduced motion); button and F key in Edit mode, click/Space in the new View mode.
+- Quotes on the wall: drag from the library, drop onto an image to put it over the image or on the back, random quote, tap/double-click to add; quote and text cards with text styles.
+- Card inspector: content and text style, focal point picker, overlay and back, caption, aspect ratio, corners, shadow, border, width.
+- Editing a quote in the library (or inspector) updates every card that uses it.
+- Fixes: drops below the last card land at the end; the quote chooser works right after a drop; only cards inside the wall listbox; 3D layers only for flip cards; the focal picker matches the image shape.
+- Tests: fit algorithm, overlay presentation, card operations; Playwright flows for all M4 criteria. Performance checks moved to `npm run e2e:perf`.
+
 ## M3 — Masonry wall (2026-09-24)
 
 - Layout engine interface and the masonry engine: shortest-column packing, span 1–3, auto/manual columns, sections as full-width blocks, month dividers. Pure and unit-tested, including "no gaps larger than the spacing" and hit testing.

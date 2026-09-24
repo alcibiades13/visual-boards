@@ -7,7 +7,7 @@ import { join } from 'node:path';
 //   PERF_DIR=/path/to/photos npx playwright test perf-upload --project=desktop
 const dir = process.env.PERF_DIR;
 
-test('uploads 100 large photos responsively', async ({ page }) => {
+test('uploads 100 large photos responsively @perf', async ({ page }) => {
   test.skip(!dir, 'set PERF_DIR to a folder with ~100 large JPEGs');
   test.setTimeout(180_000);
   const files = readdirSync(dir!)

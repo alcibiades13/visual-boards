@@ -122,8 +122,14 @@ describe('flowInsertionPoint', () => {
     expect(flowInsertionPoint(l, items, 150, 90)).toEqual({ index: 2, sectionId: undefined });
   });
 
-  it('uses the nearest card when the pointer is in empty space', () => {
+  it('puts a drop below every card at the end, even under a short column', () => {
     expect(flowInsertionPoint(l, items, 50, 500)).toEqual({ index: 4, sectionId: undefined });
+    expect(flowInsertionPoint(l, items, 250, 500)).toEqual({ index: 4, sectionId: undefined });
+  });
+
+  it('uses the nearest card when the pointer is beside the cards', () => {
+    // Under c (column 3 ends at 100) but above the bottom of d (210): nearest is c, lower half → after c.
+    expect(flowInsertionPoint(l, items, 250, 150)).toEqual({ index: 3, sectionId: undefined });
   });
 
   it('targets sections, including empty ones', () => {

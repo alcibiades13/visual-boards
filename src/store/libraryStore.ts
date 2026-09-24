@@ -15,6 +15,8 @@ interface LibraryState {
   deleteAssets(ids: ID[]): Promise<void>;
   addQuotes(quotes: Quote[]): Promise<void>;
   setQuoteFavorite(id: ID, favorite: boolean): Promise<void>;
+  /** Edits a quote everywhere: every card that references it shows the change. */
+  updateQuote(id: ID, patch: Pick<Quote, 'text'> & { author?: string }): Promise<void>;
   deleteQuotes(ids: ID[]): Promise<void>;
 }
 
@@ -56,6 +58,21 @@ export const useLibrary = create<LibraryState>((set, get) => ({
   setQuoteFavorite: async (id, favorite) => {
     set({ quotes: get().quotes.map((q) => (q.id === id ? { ...q, favorite } : q)) });
     await getRepos().quotes.update(id, { favorite });
+  },
+
+  updateQuote: async (id, { text, author }) => {
+    const clean = author?.trim();
+    set({
+      quotes: get().quotes.map((q) => {
+        if (q.id !== id) return q;
+        const next: Quote = { ...q, text };
+        if (clean) next.author = clean;
+        else delete next.author;
+        return next;
+      }),
+    });
+    const quote = get().quotes.find((q) => q.id === id);
+    if (quote) await getRepos().quotes.update(id, { text: quote.text, author: quote.author });
   },
 
   deleteQuotes: async (ids) => {

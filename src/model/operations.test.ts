@@ -1,7 +1,26 @@
 import { produce } from 'immer';
 import { describe, expect, it } from 'vitest';
 import { createBoard, createItem } from './defaults';
-import { addSection, insertItems, layoutState, moveItems, moveSection, removeItems, removeSection, setSpan } from './operations';
+import {
+  addSection,
+  insertItems,
+  layoutState,
+  moveItems,
+  moveSection,
+  removeBack,
+  removeItems,
+  removeOverlay,
+  removeSection,
+  setBack,
+  setCaption,
+  setFaceText,
+  setFocal,
+  setItemStyle,
+  setOverlay,
+  setSpan,
+  setTextStyle,
+  updateOverlay,
+} from './operations';
 import type { Board } from './types';
 
 function boardWith(n: number): Board {
@@ -65,5 +84,52 @@ describe('board operations', () => {
     expect(b.sections.map((s) => s.title)).toEqual(['Travel']);
     expect(b.items).toHaveLength(1);
     expect(b.items[0]!.sectionId).toBeUndefined();
+  });
+});
+
+describe('card content operations', () => {
+  const base = () => {
+    const board = createBoard({ title: 't' });
+    board.items.push({ ...createItem({ kind: 'image', assetId: 'a1' }), id: 'img' }, { ...createItem({ kind: 'text', text: 'Hi' }), id: 'txt' });
+    return board;
+  };
+  const style = { font: 'newsreader' as const, size: 'auto' as const, weight: 400 as const, italic: false, align: 'center' as const, color: '#fff' };
+
+  it('adds, updates and removes an overlay on image cards only', () => {
+    let b = produce(base(), (d) => {
+      setOverlay(d, 'img', { source: { quoteId: 'q1' }, position: 'bc', effect: 'dark-gradient', intensity: 0.6 });
+      setOverlay(d, 'txt', { source: { quoteId: 'q1' }, position: 'bc', effect: 'none', intensity: 0 });
+    });
+    expect(b.items[0]!.front).toMatchObject({ overlay: { position: 'bc' } });
+    expect(b.items[1]!.front).toEqual({ kind: 'text', text: 'Hi' });
+    b = produce(b, (d) => updateOverlay(d, 'img', { position: 'tl', intensity: 1 }));
+    expect(b.items[0]!.front).toMatchObject({ overlay: { position: 'tl', intensity: 1, effect: 'dark-gradient' } });
+    b = produce(b, (d) => removeOverlay(d, 'img'));
+    expect(b.items[0]!.front).toEqual({ kind: 'image', assetId: 'a1' });
+  });
+
+  it('makes and unmakes flip cards', () => {
+    let b = produce(base(), (d) => setBack(d, 'img', { kind: 'quote', quoteId: 'q1' }));
+    expect(b.items[0]!.back).toEqual({ kind: 'quote', quoteId: 'q1' });
+    b = produce(b, (d) => removeBack(d, 'img'));
+    expect(b.items[0]!.back).toBeUndefined();
+  });
+
+  it('sets caption, style, focal point, text and text style', () => {
+    const b = produce(base(), (d) => {
+      setCaption(d, 'img', 'Kyoto');
+      setItemStyle(d, ['img', 'txt'], { radius: 0, shadow: 'lifted', border: { width: 2, color: '#000' } });
+      setFocal(d, 'img', { x: 0.2, y: 0.8 });
+      setFaceText(d, 'txt', 'front', 'Hello');
+      setTextStyle(d, ['txt'], 'front', { italic: true }, style);
+    });
+    expect(b.items[0]).toMatchObject({ caption: 'Kyoto', style: { radius: 0, shadow: 'lifted', border: { width: 2 } }, front: { focal: { x: 0.2, y: 0.8 } } });
+    expect(b.items[1]!.front).toEqual({ kind: 'text', text: 'Hello', textStyle: { ...style, italic: true } });
+    const cleared = produce(b, (d) => {
+      setCaption(d, 'img', '');
+      setItemStyle(d, ['img'], { border: undefined });
+    });
+    expect(cleared.items[0]!.caption).toBeUndefined();
+    expect(cleared.items[0]!.style.border).toBeUndefined();
   });
 });

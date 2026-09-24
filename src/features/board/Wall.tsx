@@ -12,19 +12,22 @@ import {
   createLayoutState,
   removeItems,
   renameSection,
+  setBack,
+  setOverlay,
   type BoardItem,
   type ID,
   type MasonryParams,
 } from '@/model';
 import { useBoard } from '@/store/boardStore';
-import { clickSuppressed, setWallHitTest, useDrag } from '@/store/dragStore';
-import { useEditor } from '@/store/editorStore';
+import { clickSuppressed, setWallHitTest, useDrag, type WallHit } from '@/store/dragStore';
+import { useEditor, type EditorMode } from '@/store/editorStore';
 import { toast } from '@/store/toastStore';
-import { PlusIcon } from '@/ui/icons';
+import { FlipIcon, PlusIcon } from '@/ui/icons';
 import { uploadToBoard } from './actions';
 import { Card } from './Card';
 import type { DragData } from './EditorDnd';
 import { faceLabel, measureItem, type Lookup } from './measure';
+import { DEFAULT_OVERLAY } from './overlayStyle';
 import { useLookup } from './useLookup';
 
 // The board renderer (blueprint §5): it does not know which layout is active,
@@ -33,6 +36,8 @@ import { useLookup } from './useLookup';
 
 const ADD_ZONE_HEIGHT = 96;
 const NATIVE_GHOST = '__drop__';
+/** A quote dropped within this central share of an image goes onto it; nearer the edge, between cards. */
+const ONTO_CORE = 0.7;
 
 function useFontsReady(): boolean {
   const [ready, setReady] = useState(() => typeof document === 'undefined' || document.fonts.status === 'loaded');
@@ -64,8 +69,11 @@ export function Wall({ onUploadRequest }: { onUploadRequest(): void }) {
   const fontsReady = useFontsReady();
   const active = useDrag((s) => s.active);
   const target = useDrag((s) => s.target);
+  const onto = useDrag((s) => s.onto);
   const native = useDrag((s) => s.native);
   const selected = useEditor((s) => s.selected);
+  const flipped = useEditor((s) => s.flipped);
+  const mode = useEditor((s) => s.mode);
 
   const engine = getEngine(board.activeLayout);
   const state = useMemo(() => board.layouts.masonry ?? createLayoutState('masonry'), [board.layouts.masonry]);
@@ -102,6 +110,10 @@ export function Wall({ onUploadRequest }: { onUploadRequest(): void }) {
       const added = active.assetIds.map((assetId, i) => ({ ...createItem({ kind: 'image', assetId }), id: `ghost:${i}` }));
       return { display: insertAt(board.items, point, added, months), ghosts: new Set(added.map((g) => g.id)) };
     }
+    if (point && active?.kind === 'quotes') {
+      const added = active.quoteIds.map((quoteId, i) => ({ ...createItem({ kind: 'quote', quoteId }), id: `ghost:${i}` }));
+      return { display: insertAt(board.items, point, added, months), ghosts: new Set(added.map((g) => g.id)) };
+    }
     if (point && native) {
       const ghost = { ...createItem({ kind: 'image', assetId: NATIVE_GHOST }), id: NATIVE_GHOST };
       return { display: insertAt(board.items, point, [ghost], months), ghosts: new Set([NATIVE_GHOST]) };
@@ -116,50 +128,73 @@ export function Wall({ onUploadRequest }: { onUploadRequest(): void }) {
   useLayoutEffect(() => {
     hitRef.current = { layout, display, ghosts, point };
   });
-  const hitTest = useCallback((clientX: number, clientY: number): InsertionPoint | null => {
+  const toWall = useCallback((clientX: number, clientY: number) => {
     const el = scroller.current;
-    const current = hitRef.current;
-    if (!el || !current.layout) return null;
+    if (!el) return null;
     const r = el.getBoundingClientRect();
     if (clientX < r.left || clientX > r.right || clientY < r.top || clientY > r.bottom) return null;
-    const x = clientX - r.left + el.scrollLeft;
-    const y = clientY - r.top + el.scrollTop;
-    if (current.point && current.ghosts.size) {
-      for (const id of current.ghosts) {
-        const g = current.layout.rects[id];
-        if (g && x >= g.x && x <= g.x + g.w && y >= g.y && y <= g.y + g.h) return current.point;
-      }
-    }
-    return flowInsertionPoint(current.layout, current.display, x, y, current.ghosts);
+    return { x: clientX - r.left + el.scrollLeft, y: clientY - r.top + el.scrollTop };
   }, []);
+  const hitTest = useCallback(
+    (clientX: number, clientY: number, allowOnto: boolean): WallHit | null => {
+      const current = hitRef.current;
+      const p = toWall(clientX, clientY);
+      if (!p || !current.layout) return null;
+      const inside = (r: Rect, share = 1) => {
+        const mx = (r.w * (1 - share)) / 2;
+        const my = (r.h * (1 - share)) / 2;
+        return p.x >= r.x + mx && p.x <= r.x + r.w - mx && p.y >= r.y + my && p.y <= r.y + r.h - my;
+      };
+      if (allowOnto) {
+        for (const item of current.display) {
+          const r = current.layout.rects[item.id];
+          if (r && !current.ghosts.has(item.id) && item.front.kind === 'image' && inside(r, ONTO_CORE)) {
+            return { kind: 'onto', itemId: item.id };
+          }
+        }
+      }
+      if (current.point) {
+        for (const id of current.ghosts) {
+          const g = current.layout.rects[id];
+          if (g && inside(g)) return { kind: 'insert', point: current.point };
+        }
+      }
+      return { kind: 'insert', point: flowInsertionPoint(current.layout, current.display, p.x, p.y, current.ghosts) };
+    },
+    [toWall],
+  );
   useEffect(() => {
     setWallHitTest(hitTest);
     return () => setWallHitTest(null);
   }, [hitTest]);
+  const insertionAt = (clientX: number, clientY: number): InsertionPoint | null => {
+    const hit = hitTest(clientX, clientY, false);
+    return hit?.kind === 'insert' ? hit.point : null;
+  };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.target instanceof HTMLInputElement) return;
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || mode === 'view') return;
     const editor = useEditor.getState();
     if ((e.key === 'Delete' || e.key === 'Backspace') && editor.selected.size) {
       e.preventDefault();
       const ids = [...editor.selected];
       useBoard.getState().update((b) => removeItems(b, ids));
       editor.clear();
-    } else if (e.key === 'Escape') {
-      editor.clear();
     } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
       e.preventDefault();
       editor.select(board.items.map((i) => i.id));
+    } else if (e.key.toLowerCase() === 'f' && !e.metaKey && !e.ctrlKey && editor.selected.size) {
+      for (const item of board.items) if (editor.selected.has(item.id) && item.back) editor.flip(item.id);
     }
   };
 
   // Files or web images dropped straight onto the wall go to the library and here.
   const onNativeOver = (e: React.DragEvent) => {
-    if (!isImageDrag(e.dataTransfer) || useDrag.getState().active) return;
+    if (!isImageDrag(e.dataTransfer) || useDrag.getState().active || mode === 'view') return;
     e.preventDefault();
     e.stopPropagation();
     e.dataTransfer.dropEffect = 'copy';
-    const next = hitTest(e.clientX, e.clientY);
+    const next = insertionAt(e.clientX, e.clientY);
     const current = useDrag.getState().native;
     if (next?.index !== current?.index || next?.sectionId !== current?.sectionId) useDrag.getState().set({ native: next });
   };
@@ -167,10 +202,10 @@ export function Wall({ onUploadRequest }: { onUploadRequest(): void }) {
     if (!scroller.current?.contains(e.relatedTarget as Node | null)) useDrag.getState().set({ native: null });
   };
   const onNativeDrop = async (e: React.DragEvent) => {
-    if (!isImageDrag(e.dataTransfer) || useDrag.getState().active) return;
+    if (!isImageDrag(e.dataTransfer) || useDrag.getState().active || mode === 'view') return;
     e.preventDefault();
     e.stopPropagation();
-    const at = useDrag.getState().native ?? hitTest(e.clientX, e.clientY) ?? undefined;
+    const at = useDrag.getState().native ?? insertionAt(e.clientX, e.clientY) ?? undefined;
     useDrag.getState().set({ native: null });
     const dt = e.dataTransfer;
     const url = dt.files.length ? null : remoteImageUrl(dt);
@@ -185,8 +220,7 @@ export function Wall({ onUploadRequest }: { onUploadRequest(): void }) {
   };
 
   const background = board.theme.background;
-  const wallStyle =
-    background.kind === 'color' ? { background: background.value } : background.kind === 'gradient' ? { background: background.value } : undefined;
+  const wallStyle = background.kind !== 'image' ? { background: background.value } : undefined;
 
   const padding = effectivePadding(params.padding, width);
   const top = viewport.top - viewport.height;
@@ -198,6 +232,7 @@ export function Wall({ onUploadRequest }: { onUploadRequest(): void }) {
         return r && ((r.y + r.h >= top && r.y <= bottom) || ghosts.has(item.id));
       })
     : [];
+  const editing = mode === 'edit';
   const empty = board.items.length === 0 && board.sections.length === 0 && !point;
 
   return (
@@ -211,41 +246,60 @@ export function Wall({ onUploadRequest }: { onUploadRequest(): void }) {
       onDragLeave={onNativeLeave}
       onDrop={(e) => void onNativeDrop(e)}
       data-testid="wall"
+      data-mode={mode}
     >
       {layout && (
         <div
-          role="listbox"
-          aria-label={t('wall.label')}
-          aria-multiselectable="true"
           className="relative"
-          style={{ height: layout.height + ADD_ZONE_HEIGHT + padding }}
+          style={{ height: layout.height + (editing ? ADD_ZONE_HEIGHT : 0) + padding }}
           onClick={(e) => e.target === e.currentTarget && useEditor.getState().clear()}
         >
-          {layout.headers.map((h) => (
-            <SectionHeaderView key={h.sectionId} sectionId={h.sectionId} y={h.y} x={padding} width={width - padding * 2} />
-          ))}
-          {layout.blocks
-            ?.filter((b) => b.sectionId && !b.itemIds.length)
-            .map((b) => (
-              <div
-                key={`empty-${b.sectionId}`}
-                className="absolute flex items-center justify-center rounded-lg border border-dashed border-line text-[13px] text-faint"
-                style={{ left: padding, width: width - padding * 2, top: b.top + HEADER_HEIGHT, height: EMPTY_SECTION_HEIGHT - 8 }}
-              >
-                {t('wall.emptySection')}
-              </div>
+          {/* Only cards live in the listbox; headers, drop areas and buttons are its siblings. */}
+          <div
+            role={editing ? 'listbox' : 'list'}
+            aria-label={t('wall.label')}
+            aria-multiselectable={editing || undefined}
+            className="absolute inset-0"
+            onClick={(e) => e.target === e.currentTarget && useEditor.getState().clear()}
+          >
+            {visible.map((item) => (
+              <WallCard
+                key={item.id}
+                item={byId.get(item.id)!}
+                rect={layout.rects[item.id]!}
+                lookup={lookup}
+                mode={mode}
+                selected={selected.has(item.id)}
+                flipped={flipped.has(item.id)}
+                placeholder={ghosts.has(item.id)}
+                dropOnto={onto === item.id}
+              />
             ))}
-          {visible.map((item) => (
-            <WallCard
-              key={item.id}
-              item={byId.get(item.id)!}
-              rect={layout.rects[item.id]!}
-              lookup={lookup}
-              selected={selected.has(item.id)}
-              placeholder={ghosts.has(item.id)}
+          </div>
+          {layout.headers.map((h) => (
+            <SectionHeaderView
+              key={h.sectionId}
+              sectionId={h.sectionId}
+              y={h.y}
+              x={padding}
+              width={width - padding * 2}
+              editable={editing}
             />
           ))}
-          {!empty && (
+          {editing &&
+            layout.blocks
+              ?.filter((b) => b.sectionId && !b.itemIds.length)
+              .map((b) => (
+                <div
+                  key={`empty-${b.sectionId}`}
+                  className="pointer-events-none absolute flex items-center justify-center rounded-lg border border-dashed border-line text-[13px] text-faint"
+                  style={{ left: padding, width: width - padding * 2, top: b.top + HEADER_HEIGHT, height: EMPTY_SECTION_HEIGHT - 8 }}
+                >
+                  {t('wall.emptySection')}
+                </div>
+              ))}
+          <QuoteDropChooser layout={layout} />
+          {editing && !empty && (
             <button
               type="button"
               onClick={onUploadRequest}
@@ -261,7 +315,7 @@ export function Wall({ onUploadRequest }: { onUploadRequest(): void }) {
           )}
         </div>
       )}
-      {empty && <EmptyWall onUploadRequest={onUploadRequest} />}
+      {empty && editing && <EmptyWall onUploadRequest={onUploadRequest} />}
     </div>
   );
 }
@@ -293,6 +347,69 @@ function EmptyWall({ onUploadRequest }: { onUploadRequest(): void }) {
   );
 }
 
+/**
+ * Activates on pointer up as well as on keyboard clicks: right after a drop,
+ * dnd-kit swallows the next click for a moment, which could eat a quick choice.
+ */
+function choose(action: () => void) {
+  return {
+    onPointerUp: (e: React.PointerEvent) => e.button === 0 && action(),
+    onClick: (e: React.MouseEvent) => e.detail === 0 && action(), // keyboard (Enter/Space)
+  };
+}
+
+/** "Over the image" or "On the back" after a quote was dropped onto an image (blueprint §6). */
+function QuoteDropChooser({ layout }: { layout: ComputedLayout }) {
+  const t = useT();
+  const choice = useEditor((s) => s.quoteDrop);
+  const panel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!choice) return;
+    panel.current?.querySelector('button')?.focus();
+    const close = (e: PointerEvent | KeyboardEvent) => {
+      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !panel.current?.contains(e.target as Node)) {
+        useEditor.getState().setQuoteDrop(null);
+      }
+    };
+    window.addEventListener('pointerdown', close);
+    window.addEventListener('keydown', close);
+    return () => {
+      window.removeEventListener('pointerdown', close);
+      window.removeEventListener('keydown', close);
+    };
+  }, [choice]);
+  if (!choice) return null;
+  const rect = layout.rects[choice.itemId];
+  if (!rect) return null;
+
+  const place = (where: 'over' | 'back') => {
+    const { itemId, quoteId } = choice;
+    useBoard.getState().update((b) => {
+      if (where === 'over') setOverlay(b, itemId, { source: { quoteId }, ...DEFAULT_OVERLAY });
+      else setBack(b, itemId, { kind: 'quote', quoteId });
+    });
+    useEditor.getState().setQuoteDrop(null);
+    useEditor.getState().select([itemId], itemId);
+  };
+
+  return (
+    <div
+      ref={panel}
+      role="dialog"
+      aria-label={t('quoteDrop.title')}
+      className="absolute z-20 flex -translate-x-1/2 -translate-y-1/2 flex-col gap-1 rounded-lg border border-line bg-surface p-1.5 shadow-lifted"
+      style={{ left: rect.x + rect.w / 2, top: rect.y + Math.min(rect.h / 2, 160) }}
+    >
+      <button type="button" {...choose(() => place('over'))} className="rounded-md px-3 py-2 text-left text-sm hover:bg-surface-2 focus:bg-surface-2 focus:outline-none">
+        {t('quoteDrop.over')}
+      </button>
+      <button type="button" {...choose(() => place('back'))} className="rounded-md px-3 py-2 text-left text-sm hover:bg-surface-2 focus:bg-surface-2 focus:outline-none">
+        {t('quoteDrop.back')}
+      </button>
+    </div>
+  );
+}
+
 const monthFormatters = new Map<string, Intl.DateTimeFormat>();
 function monthLabel(locale: string, key: string): string {
   let f = monthFormatters.get(locale);
@@ -301,17 +418,18 @@ function monthLabel(locale: string, key: string): string {
   return label.charAt(0).toLocaleUpperCase(locale) + label.slice(1);
 }
 
-function SectionHeaderView({ sectionId, x, y, width }: { sectionId: ID; x: number; y: number; width: number }) {
+function SectionHeaderView({ sectionId, x, y, width, editable }: { sectionId: ID; x: number; y: number; width: number; editable: boolean }) {
   const t = useT();
   const locale = useLocale((s) => s.locale);
   const section = useBoard((s) => s.board?.sections.find((sec) => sec.id === sectionId));
   const style = { transform: `translate(${x}px, ${y}px)`, width, height: HEADER_HEIGHT };
   const className = 'absolute top-0 left-0 flex items-end border-b border-line pb-2 transition-transform duration-200 ease-calm';
 
-  if (sectionId.startsWith(MONTH_PREFIX)) {
+  if (sectionId.startsWith(MONTH_PREFIX) || !editable) {
+    const title = sectionId.startsWith(MONTH_PREFIX) ? monthLabel(locale, sectionId) : section?.title || t('wall.untitledSection');
     return (
       <div className={className} style={style} role="heading" aria-level={2}>
-        <span className="font-serif text-2xl">{monthLabel(locale, sectionId)}</span>
+        <span className="px-1 font-serif text-2xl">{title}</span>
       </div>
     );
   }
@@ -333,46 +451,93 @@ interface WallCardProps {
   item: BoardItem;
   rect: Rect;
   lookup: Lookup;
+  mode: EditorMode;
   selected: boolean;
+  flipped: boolean;
   placeholder: boolean;
+  dropOnto: boolean;
 }
 
-const WallCard = memo(function WallCard({ item, rect, lookup, selected, placeholder }: WallCardProps) {
+const WallCard = memo(function WallCard({ item, rect, lookup, mode, selected, flipped, placeholder, dropOnto }: WallCardProps) {
+  const t = useT();
   const ghost = item.id.startsWith('ghost:') || item.id === NATIVE_GHOST;
+  const editing = mode === 'edit';
   const data: DragData = { kind: 'item', itemId: item.id };
-  const { setNodeRef, listeners, attributes } = useDraggable({ id: `item:${item.id}`, data, disabled: ghost });
+  const { setNodeRef, listeners, attributes } = useDraggable({ id: `item:${item.id}`, data, disabled: ghost || !editing });
+  const canFlip = !!item.back;
+  const flip = () => useEditor.getState().flip(item.id);
 
   const onClick = (e: React.MouseEvent) => {
     if (clickSuppressed()) return;
+    if (!editing) {
+      if (canFlip) flip();
+      return;
+    }
     const editor = useEditor.getState();
     if (e.shiftKey || e.metaKey || e.ctrlKey) editor.toggle(item.id);
     else editor.select([item.id], item.id);
   };
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === ' ' && canFlip) {
+      e.preventDefault();
+      flip();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (editing) useEditor.getState().select([item.id], item.id);
+      else if (canFlip) flip();
+    }
+  };
+
+  const front = faceLabel(item.front, lookup);
+  const label = canFlip ? `${front}. ${t('card.backSide')}: ${faceLabel(item.back!, lookup)}` : front;
 
   return (
     <div
       ref={setNodeRef}
-      {...attributes}
-      {...listeners}
-      role="option"
-      aria-selected={selected}
-      aria-label={faceLabel(item.front, lookup)}
+      {...(editing ? attributes : {})}
+      {...(editing ? listeners : {})}
+      role={editing ? 'option' : canFlip ? 'button' : 'listitem'}
+      aria-selected={editing ? selected : undefined}
+      aria-pressed={!editing && canFlip ? flipped : undefined}
+      aria-label={label}
       data-item-id={ghost ? undefined : item.id}
       data-placeholder={placeholder || undefined}
+      data-flipped={(canFlip && flipped) || undefined}
       tabIndex={0}
       onClick={onClick}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') onClick(e as unknown as React.MouseEvent);
-      }}
-      className="absolute top-0 left-0 touch-manipulation select-none [-webkit-touch-callout:none] transition-[transform,width,height] duration-200 ease-calm focus-visible:outline-offset-4"
+      onKeyDown={onKeyDown}
+      className={`group absolute top-0 left-0 touch-manipulation select-none [-webkit-touch-callout:none] transition-[transform,width,height] duration-200 ease-calm focus-visible:outline-offset-4 ${
+        !editing && canFlip ? 'cursor-pointer' : ''
+      }`}
       style={{ width: rect.w, height: rect.h, transform: `translate(${rect.x}px, ${rect.y}px)` }}
     >
       <div className={`h-full w-full ${placeholder ? 'opacity-35' : ''}`}>
-        <Card item={item} lookup={lookup} />
+        <Card item={item} lookup={lookup} width={rect.w} height={rect.h} flipped={flipped} />
       </div>
       {placeholder && <div className="pointer-events-none absolute inset-0 rounded-lg border-2 border-dashed border-accent" />}
-      {selected && !placeholder && (
-        <div className="pointer-events-none absolute -inset-1 rounded-[10px] ring-2 ring-accent" />
+      {dropOnto && (
+        <div className="pointer-events-none absolute inset-0 flex items-start justify-center rounded-lg bg-accent/15 pt-3 ring-2 ring-accent">
+          <span className="rounded-full bg-accent px-3 py-1 text-[12px] font-medium text-accent-ink">{t('wall.dropOnImage')}</span>
+        </div>
+      )}
+      {selected && !placeholder && editing && <div className="pointer-events-none absolute -inset-1 rounded-[10px] ring-2 ring-accent" />}
+      {editing && canFlip && !placeholder && (
+        <button
+          type="button"
+          aria-label={t('card.flip')}
+          aria-pressed={flipped}
+          onClick={(e) => {
+            e.stopPropagation();
+            flip();
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-surface/85 text-ink shadow-soft backdrop-blur transition-opacity duration-(--vb-fast) hover:bg-surface"
+        >
+          <FlipIcon size={16} />
+        </button>
       )}
     </div>
   );

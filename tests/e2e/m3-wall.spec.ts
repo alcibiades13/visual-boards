@@ -252,7 +252,7 @@ test('touch: long press reorders on the wall; tap in the library adds to the end
   await expect.poll(async () => (await boardItems(page)).items.map((i) => i.id)).toEqual([before[1], before[2], before[0]]);
 });
 
-test('1000 cards: only nearby cards are mounted, scrolling stays smooth, nothing shifts while images load', async ({ page, isMobile }) => {
+test('1000 cards: only nearby cards are mounted, scrolling stays smooth, nothing shifts while images load @perf', async ({ page, isMobile }) => {
   test.skip(isMobile, 'measured on desktop and tablet');
   test.setTimeout(90_000);
   await newBoard(page);

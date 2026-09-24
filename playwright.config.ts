@@ -3,6 +3,8 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: 'tests/e2e',
   fullyParallel: true,
+  // Each page runs its own pool of image workers; more browsers than this starve each other.
+  workers: 3,
   reporter: 'list',
   use: { baseURL: 'http://localhost:4173', trace: 'retain-on-failure' },
   webServer: {

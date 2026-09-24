@@ -15,7 +15,8 @@ A local-first web app for collecting photos and quotes and composing them into i
 npm install
 npm run dev        # http://localhost:5173
 npm run check      # typecheck + lint + unit tests
-npm run e2e        # Playwright smoke tests (desktop, tablet, phone)
+npm run e2e        # Playwright tests (desktop, tablet, phone)
+npm run e2e:perf   # 1000-card wall and 100-photo upload checks, one at a time
 npm run build
 ```
 

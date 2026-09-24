@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import { useT } from '@/i18n';
 import { MAX_COLUMNS } from '@/layout/masonry';
 import {
@@ -6,10 +5,8 @@ import {
   addSection,
   layoutState,
   moveSection,
-  removeItems,
   removeSection,
   renameSection,
-  setSpan,
   type Board,
   type MasonryParams,
 } from '@/model';
@@ -17,20 +14,11 @@ import { useBoard } from '@/store/boardStore';
 import { useEditor } from '@/store/editorStore';
 import { Button } from '@/ui/Button';
 import { ArrowLeftIcon, TrashIcon } from '@/ui/icons';
-import { Segmented } from '@/ui/Segmented';
+import { CardInspector } from './inspector/CardInspector';
+import { Field } from './inspector/fields';
 
 // Contextual inspector (blueprint §8): board settings without a selection,
 // card settings with one. M6 extends it; the structure stays.
-
-function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
-  return (
-    <div className="flex flex-col gap-2">
-      <span className="text-[12px] font-medium tracking-wide text-muted uppercase">{label}</span>
-      {children}
-      {hint && <span className="text-[12px] leading-snug text-faint">{hint}</span>}
-    </div>
-  );
-}
 
 function masonryParams(board: Board): MasonryParams {
   return board.layouts.masonry?.params ?? DEFAULT_MASONRY_PARAMS;
@@ -146,40 +134,6 @@ function BoardSettings({ board }: { board: Board }) {
   );
 }
 
-function CardSettings({ board, ids }: { board: Board; ids: string[] }) {
-  const t = useT();
-  const update = useBoard((s) => s.update);
-  const overrides = board.layouts.masonry?.overrides ?? {};
-  const spans = new Set(ids.map((id) => overrides[id]?.span ?? 1));
-  const span = spans.size === 1 ? String([...spans][0]) : '';
-
-  return (
-    <div className="flex flex-col gap-6">
-      <p className="text-[13px] font-medium">{t('inspector.selected', { count: ids.length })}</p>
-      <Field label={t('inspector.width')}>
-        <Segmented
-          label={t('inspector.width')}
-          value={span}
-          onChange={(v) => update((b) => setSpan(b, 'masonry', ids, Number(v) as 1 | 2 | 3))}
-          options={(['1', '2', '3'] as const).map((n) => [n, t('inspector.span', { count: Number(n) })])}
-        />
-      </Field>
-      <Field label={t('inspector.remove')} hint={t('inspector.removeHint')}>
-        <Button
-          size="sm"
-          onClick={() => {
-            update((b) => removeItems(b, ids));
-            useEditor.getState().clear();
-          }}
-        >
-          <TrashIcon size={15} />
-          {t('inspector.remove')}
-        </Button>
-      </Field>
-    </div>
-  );
-}
-
 export function Inspector() {
   const t = useT();
   const board = useBoard((s) => s.board);
@@ -188,7 +142,7 @@ export function Inspector() {
   const ids = board.items.filter((i) => selected.has(i.id)).map((i) => i.id);
   return (
     <section aria-label={ids.length ? t('inspector.selected', { count: ids.length }) : t('inspector.board')} className="p-4">
-      {ids.length ? <CardSettings board={board} ids={ids} /> : <BoardSettings board={board} />}
+      {ids.length ? <CardInspector board={board} ids={ids} /> : <BoardSettings board={board} />}
     </section>
   );
 }

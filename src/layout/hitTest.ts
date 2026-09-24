@@ -46,6 +46,10 @@ export function flowInsertionPoint(
     return { index: last === undefined ? 0 : index.get(last)! + 1, sectionId };
   }
 
+  // Below every card of the block: at its end.
+  const lowest = Math.max(...block.itemIds.map((id) => layout.rects[id]!.y + layout.rects[id]!.h));
+  if (y > lowest) return { index: index.get(block.itemIds[block.itemIds.length - 1]!)! + 1, sectionId };
+
   let nearest: ID = block.itemIds[0]!;
   let nearestDist = Infinity;
   for (const id of block.itemIds) {

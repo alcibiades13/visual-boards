@@ -1,4 +1,4 @@
-import type { AspectRatio, BoardItem, Face, ImageAsset, Quote } from '@/model';
+import type { AspectRatio, BoardItem, Face, ImageAsset, Quote, TextOverlay } from '@/model';
 import { measureCaption, measureTextCard } from './cardText';
 
 const ASPECTS: Record<Exclude<AspectRatio, 'original'>, number> = {
@@ -26,10 +26,10 @@ function faceHeight(face: Face, item: BoardItem, width: number, lookup: Lookup):
       return width * imageRatio(item.style.aspect, lookup.assets.get(face.assetId));
     case 'quote': {
       const quote = lookup.quotes.get(face.quoteId);
-      return measureTextCard({ variant: 'quote', text: quote?.text ?? '…', author: quote?.author }, width);
+      return measureTextCard({ variant: 'quote', text: quote?.text ?? '…', author: quote?.author, style: face.textStyle }, width);
     }
     case 'text':
-      return measureTextCard({ variant: 'text', text: face.text || ' ' }, width);
+      return measureTextCard({ variant: 'text', text: face.text || ' ', style: face.textStyle }, width);
   }
 }
 
@@ -38,6 +38,15 @@ export function measureItem(item: BoardItem, width: number, lookup: Lookup): num
   let h = faceHeight(item.front, item, width, lookup);
   if (item.caption) h += measureCaption(item.caption, width);
   return h;
+}
+
+/** Text shown by a text source: a library quote or local text. */
+export function sourceText(source: TextOverlay['source'], lookup: Lookup): { text: string; author?: string } {
+  if ('quoteId' in source) {
+    const q = lookup.quotes.get(source.quoteId);
+    return q ? { text: q.text, author: q.author } : { text: '…' };
+  }
+  return { text: source.text };
 }
 
 /** Accessible name of a card face. */

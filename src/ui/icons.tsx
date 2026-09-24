@@ -95,3 +95,23 @@ export const SidebarIcon = (p: IconProps) => (
     <path d="M8 4v12" />
   </Icon>
 );
+export const FlipIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 8a6 6 0 0 1 10.5-3.5L16 6M16 3v3h-3M16 12a6 6 0 0 1-10.5 3.5L4 14M4 17v-3h3" />
+  </Icon>
+);
+export const EditIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12.5 4.5 15.5 7.5M4 16l.8-3.4L13.5 4a1.4 1.4 0 0 1 2 0l.5.5a1.4 1.4 0 0 1 0 2l-8.6 8.7L4 16Z" />
+  </Icon>
+);
+export const ShuffleIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M3 6h3.5c3 0 4 8 7 8H17M3 14h3.5c1.3 0 2.2-1.5 3-3.2M13.5 6H17M15 4l2 2-2 2M15 12l2 2-2 2" />
+  </Icon>
+);
+export const TextIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 5.5V4h12v1.5M10 4v12M7.5 16h5" />
+  </Icon>
+);
