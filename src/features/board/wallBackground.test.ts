@@ -14,4 +14,11 @@ describe('wall background', () => {
     expect(wallInkVars({ kind: 'color', value: 'var(--vb-board)' })).toEqual({});
     expect(wallInkVars({ kind: 'image', assetId: 'a' })).toEqual({});
   });
+
+  it('matches wall text to the veil over a background image', () => {
+    expect(wallInkVars({ kind: 'image', assetId: 'a', dim: 0.4, veil: 'dark' })).toMatchObject({ '--wall-ink': '#f1ede6' });
+    expect(wallInkVars({ kind: 'image', assetId: 'a', dim: 0.4, veil: 'light' })).toMatchObject({ '--wall-ink': '#1f1d1a' });
+    expect(wallInkVars({ kind: 'image', assetId: 'a', dim: 0.4 })).toMatchObject({ '--wall-ink': '#1f1d1a' });
+    expect(wallInkVars({ kind: 'image', assetId: 'a', dim: 0.05, veil: 'dark' })).toEqual({});
+  });
 });

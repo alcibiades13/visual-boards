@@ -16,7 +16,8 @@ export const BACKGROUND_SWATCHES = [
 ];
 
 export const DEFAULT_DIM = 0.3;
-export const MAX_DIM = 0.8;
+export const VEIL_COLORS = { light: '#f7f3ec', dark: '#141312' } as const;
+export const MAX_DIM = 1;
 
 /** Relative luminance (WCAG) of a #rgb / #rrggbb color; null for anything else. */
 export function luminance(color: string): number | null {
@@ -30,19 +31,29 @@ export function luminance(color: string): number | null {
   return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
 }
 
+const LIGHT_INK = {
+  '--wall-ink': '#f1ede6',
+  '--wall-muted': 'rgb(241 237 230 / 0.75)',
+  '--wall-line': 'rgb(241 237 230 / 0.3)',
+} as CSSProperties;
+const DARK_INK = {
+  '--wall-ink': '#1f1d1a',
+  '--wall-muted': 'rgb(31 29 26 / 0.7)',
+  '--wall-line': 'rgb(31 29 26 / 0.2)',
+} as CSSProperties;
+
 /**
  * Colors for things drawn directly on the wall (section titles, empty areas,
- * the add button). Cards keep their own colors. Theme and image backgrounds
- * use the theme (images get a theme-colored veil).
+ * the add button). Cards keep their own colors. The theme background uses the
+ * theme; a color or a veiled image picks light or dark text to match.
  */
 export function wallInkVars(background: BoardBackground): CSSProperties {
+  if (background.kind === 'image') {
+    if ((background.dim ?? 0) < 0.15) return {}; // barely veiled: keep the theme
+    return background.veil === 'dark' ? LIGHT_INK : DARK_INK;
+  }
   if (background.kind !== 'color') return {};
   const l = luminance(background.value);
   if (l === null) return {};
-  const dark = l < 0.25;
-  return {
-    '--wall-ink': dark ? '#f1ede6' : '#1f1d1a',
-    '--wall-muted': dark ? 'rgb(241 237 230 / 0.7)' : 'rgb(31 29 26 / 0.65)',
-    '--wall-line': dark ? 'rgb(241 237 230 / 0.22)' : 'rgb(31 29 26 / 0.16)',
-  } as CSSProperties;
+  return l < 0.25 ? LIGHT_INK : DARK_INK;
 }

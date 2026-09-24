@@ -215,7 +215,7 @@ export type LayoutStates = { [K in LayoutId]?: LayoutState<LayoutParamsMap[K]> }
 export type BoardBackground =
   | { kind: 'color'; value: string }
   | { kind: 'gradient'; value: string }
-  | { kind: 'image'; assetId: ID; dim?: number }; // dim 0..0.8: theme-colored veil for readability
+  | { kind: 'image'; assetId: ID; dim?: number; veil?: 'light' | 'dark' }; // veil over the image (default light), dim 0..1
 
 export interface BoardTheme {
   background: BoardBackground;

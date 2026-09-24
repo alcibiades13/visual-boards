@@ -3,7 +3,7 @@
 ## After M4 — owner feedback (2026-09-24)
 
 - Vision Board sections are optional and off by default: one open board unless you pick sections.
-- Board background: theme default, a color, or a library image with a softening veil; wall titles stay readable on dark colors.
+- Board background: theme default, a color, or a library image with a light or dark softening veil (0–100%); wall titles adapt to the background.
 - Quote dragging no longer reshuffles the wall between images; new "As a separate card" choice.
 - Test robustness: wait for persisted state instead of fixed delays.
 

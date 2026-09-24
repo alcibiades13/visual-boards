@@ -30,7 +30,7 @@ import type { DragData } from './EditorDnd';
 import { faceLabel, measureItem, type Lookup } from './measure';
 import { DEFAULT_OVERLAY } from './overlayStyle';
 import { useLookup } from './useLookup';
-import { wallInkVars } from './wallBackground';
+import { VEIL_COLORS, wallInkVars } from './wallBackground';
 import { useBlobUrl } from '@/images/blobUrls';
 import { useLibrary } from '@/store/libraryStore';
 
@@ -353,7 +353,11 @@ function WallBackground({ background }: { background: BoardBackground }) {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden bg-board" data-testid="wall-background">
       {url && <img src={url} alt="" className="h-full w-full object-cover" />}
-      <div className="absolute inset-0 bg-bg" style={{ opacity: background.dim ?? 0 }} />
+      <div
+        className="absolute inset-0"
+        style={{ background: VEIL_COLORS[background.veil ?? 'light'], opacity: background.dim ?? 0 }}
+        data-testid="wall-veil"
+      />
     </div>
   );
 }

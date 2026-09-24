@@ -89,6 +89,15 @@ export function BackgroundField({ board }: { board: Board }) {
 
       {mode === 'image' && bg.kind === 'image' && (
         <>
+          <Segmented
+            label={t('background.veil')}
+            value={bg.veil ?? 'light'}
+            onChange={(veil) => put({ ...bg, veil })}
+            options={[
+              ['light', t('background.veilLight')],
+              ['dark', t('background.veilDark')],
+            ]}
+          />
           <span className="-mb-1 text-[13px] text-muted">{t('background.dim')}</span>
           <Slider
             label={t('background.dim')}
@@ -105,7 +114,7 @@ export function BackgroundField({ board }: { board: Board }) {
                 key={asset.id}
                 asset={asset}
                 selected={bg.assetId === asset.id}
-                onPick={() => put({ kind: 'image', assetId: asset.id, dim: bg.dim ?? DEFAULT_DIM })}
+                onPick={() => put({ ...bg, assetId: asset.id })}
               />
             ))}
           </div>

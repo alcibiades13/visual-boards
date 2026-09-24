@@ -47,8 +47,13 @@ test('board background: theme, color (with readable titles) and a library image 
   // A library image, softened.
   await background.getByRole('radio', { name: 'Image' }).click();
   await expect(layer.locator('img')).toHaveJSProperty('complete', true);
+  await expect(page.getByRole('slider', { name: 'Soften' })).toHaveAttribute('max', '100');
   await page.getByRole('slider', { name: 'Soften' }).fill('50');
-  await expect.poll(async () => (await saved(page)).theme.background).toMatchObject({ kind: 'image', dim: 0.5 });
+  await expect(page.getByTestId('wall-veil')).toHaveCSS('background-color', 'rgb(247, 243, 236)');
+  await page.getByRole('radio', { name: 'Dark veil' }).click();
+  await expect(page.getByTestId('wall-veil')).toHaveCSS('background-color', 'rgb(20, 19, 18)');
+  await expect(page.getByTestId('wall').getByRole('textbox', { name: 'Section title' })).toHaveCSS('color', 'rgb(241, 237, 230)');
+  await expect.poll(async () => (await saved(page)).theme.background).toMatchObject({ kind: 'image', dim: 0.5, veil: 'dark' });
 
   await page.reload();
   await expect(page.getByTestId('wall-background').locator('img')).toBeVisible();
