@@ -54,3 +54,10 @@
     --vb-slow: 0ms;
   }
 }
+
+/* Text drawn directly on the board wall; boards with an explicit color override these. */
+:root {
+  --wall-ink: var(--vb-ink);
+  --wall-muted: var(--vb-muted);
+  --wall-line: var(--vb-line);
+}

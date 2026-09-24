@@ -70,3 +70,10 @@ Short notes on choices the blueprint does not cover. Newest last.
 - **Random quote** prefers quotes not yet on the board. On touch, tapping a quote adds it to the end; with a mouse, double-click.
 - **Only cards are inside the wall's `listbox`**; section headers, drop areas, the chooser and the add button are siblings (a listbox may only contain options, and browsers drop anything else from the accessibility tree).
 - **Tests**: Playwright runs 3 workers (each page starts its own image worker pool; with more, this 15 GB machine swapped and pages stalled for seconds). The 1000-card wall and 100-photo upload checks are tagged `@perf` and run alone with `npm run e2e:perf`.
+
+## After M4 (owner feedback)
+
+- **Vision Board sections are opt-in**: the new-board dialog shows them unselected, so a Vision Board is one open board unless sections are chosen (blueprint: the preset *offers* optional sections). Inspiration Wall and Blank never have sections.
+- **Board background** (MVP "osnovni stil: pozadina boarda"), in the board settings: Theme (default, follows light/dark), Color (8 calm swatches + any color) or Image from the library with a "Soften" veil (0–80%, default 30%, theme-colored so it works in both themes). The background is a fixed layer behind the scrolling wall, so long walls scroll over one image instead of stretching it; it uses the full-size image. `BoardBackground.image` gained an optional `dim` (backward compatible, no migration). Text drawn directly on the wall (section titles, empty areas, add button) switches between dark and light by the chosen color's luminance; cards keep their own colors.
+- **Dragging a quote** (reworked after an oscillation found in testing): anywhere on an image card means "onto the image"; in the gaps between cards the target does not change, so the wall does not reshuffle under the pointer; over a quote/text card or below all cards it inserts a new card. The chooser gained "As a separate card" (placed right after the image), so a quote can still go next to an image.
+- The wall exposes `data-drop-onto` / `data-drop-index` for tests.

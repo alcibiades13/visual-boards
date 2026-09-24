@@ -1,5 +1,5 @@
 import { createLayoutState, newId } from './defaults';
-import type { Board, BoardItem, Face, FocalPoint, ID, ItemStyle, LayoutId, LayoutParamsMap, LayoutState, TextOverlay, TextStyle } from './types';
+import type { Board, BoardBackground, BoardItem, Face, FocalPoint, ID, ItemStyle, LayoutId, LayoutParamsMap, LayoutState, TextOverlay, TextStyle } from './types';
 
 // Board edits as plain mutations. They run inside boardStore.update() on an
 // Immer draft, and in tests on produce(). Content order lives in board.items;
@@ -175,4 +175,8 @@ export function setTextStyle(board: Board, ids: ID[], side: 'front' | 'back', pa
       face.textStyle = { ...base, ...face.textStyle, ...patch };
     }
   });
+}
+
+export function setBackground(board: Board, background: BoardBackground): void {
+  board.theme.background = background;
 }

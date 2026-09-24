@@ -56,7 +56,7 @@ export function NewBoardDialog({ onClose }: { onClose(): void }) {
   const [title, setTitle] = useState('');
   const [preset, setPreset] = useState<StartPreset>('wall');
   const sectionKeys = PRESETS.vision.sections;
-  const [sections, setSections] = useState<string[]>(sectionKeys);
+  const [sections, setSections] = useState<string[]>([]); // optional: one open board unless chosen
 
   const create = async () => {
     const board = createBoard({

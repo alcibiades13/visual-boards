@@ -14,6 +14,9 @@
   --color-accent: var(--vb-accent);
   --color-accent-ink: var(--vb-accent-ink);
   --color-danger: var(--vb-danger);
+  --color-wall-ink: var(--wall-ink);
+  --color-wall-muted: var(--wall-muted);
+  --color-wall-line: var(--wall-line);
   --font-serif: var(--vb-font-serif);
   --font-sans: var(--vb-font-sans);
   --shadow-soft: var(--vb-shadow-soft);

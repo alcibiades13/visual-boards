@@ -29,9 +29,8 @@ test('create, rename, duplicate and delete boards', async ({ page }) => {
   await createBoard(page, 'Autumn 2026', 'Vision Board');
   const board = (await dumpDb(page)).boards[0]!;
   expect(board).toMatchObject({ title: 'Autumn 2026', preset: 'vision', activeLayout: 'masonry' });
-  expect((board as unknown as { sections: { title: string }[] }).sections.map((s) => s.title)).toEqual([
-    'Health', 'Travel', 'Work', 'Relationships', 'Creativity', 'Home',
-  ]);
+  // Sections are optional: a Vision Board without chosen sections is one open board.
+  expect((board as unknown as { sections: unknown[] }).sections).toEqual([]);
 
   await page.getByRole('link', { name: 'Boards' }).click();
   await expect(card(page, 'Autumn 2026')).toContainText('edited');
@@ -138,6 +137,7 @@ test('backup reminder after 30 days with changes, snoozable', async ({ page }) =
   await expect(note).toContainText('Last backup');
   await note.getByRole('button', { name: 'Later' }).click();
   await expect(note).toHaveCount(0);
+  await expect.poll(async () => (await dumpDb(page)).meta.backupSnoozedUntil).toBeTruthy();
   await page.reload();
   await expect(cards(page)).toHaveCount(2);
   await expect(page.getByRole('note')).toHaveCount(0);

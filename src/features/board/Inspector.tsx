@@ -15,6 +15,7 @@ import { useEditor } from '@/store/editorStore';
 import { Button } from '@/ui/Button';
 import { ArrowLeftIcon, TrashIcon } from '@/ui/icons';
 import { CardInspector } from './inspector/CardInspector';
+import { BackgroundField } from './inspector/BackgroundField';
 import { Field } from './inspector/fields';
 
 // Contextual inspector (blueprint §8): board settings without a selection,
@@ -33,6 +34,8 @@ function BoardSettings({ board }: { board: Board }) {
 
   return (
     <div className="flex flex-col gap-6">
+      <BackgroundField board={board} />
+
       <Field label={t('inspector.columns')}>
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-1.5 text-[13px]">

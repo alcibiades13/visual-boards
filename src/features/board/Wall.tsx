@@ -14,6 +14,7 @@ import {
   renameSection,
   setBack,
   setOverlay,
+  type BoardBackground,
   type BoardItem,
   type ID,
   type MasonryParams,
@@ -23,12 +24,15 @@ import { clickSuppressed, setWallHitTest, useDrag, type WallHit } from '@/store/
 import { useEditor, type EditorMode } from '@/store/editorStore';
 import { toast } from '@/store/toastStore';
 import { FlipIcon, PlusIcon } from '@/ui/icons';
-import { uploadToBoard } from './actions';
+import { addQuotesToBoard, uploadToBoard } from './actions';
 import { Card } from './Card';
 import type { DragData } from './EditorDnd';
 import { faceLabel, measureItem, type Lookup } from './measure';
 import { DEFAULT_OVERLAY } from './overlayStyle';
 import { useLookup } from './useLookup';
+import { wallInkVars } from './wallBackground';
+import { useBlobUrl } from '@/images/blobUrls';
+import { useLibrary } from '@/store/libraryStore';
 
 // The board renderer (blueprint §5): it does not know which layout is active,
 // it draws ComputedLayout.rects with CSS transforms. Only cards near the
@@ -36,8 +40,8 @@ import { useLookup } from './useLookup';
 
 const ADD_ZONE_HEIGHT = 96;
 const NATIVE_GHOST = '__drop__';
-/** A quote dropped within this central share of an image goes onto it; nearer the edge, between cards. */
-const ONTO_CORE = 0.7;
+/** While dragging a quote, a pointer this close to a card counts as "between cards": nothing changes. */
+const GAP_HOLD = 24;
 
 function useFontsReady(): boolean {
   const [ready, setReady] = useState(() => typeof document === 'undefined' || document.fonts.status === 'loaded');
@@ -124,9 +128,9 @@ export function Wall({ onUploadRequest }: { onUploadRequest(): void }) {
 
   // Hit testing uses what the user sees. Over a placeholder nothing changes,
   // so the target cannot flicker while the other cards make room.
-  const hitRef = useRef({ layout, display, ghosts, point });
+  const hitRef = useRef({ layout, display, ghosts, point, onto });
   useLayoutEffect(() => {
-    hitRef.current = { layout, display, ghosts, point };
+    hitRef.current = { layout, display, ghosts, point, onto };
   });
   const toWall = useCallback((clientX: number, clientY: number) => {
     const el = scroller.current;
@@ -146,11 +150,24 @@ export function Wall({ onUploadRequest }: { onUploadRequest(): void }) {
         return p.x >= r.x + mx && p.x <= r.x + r.w - mx && p.y >= r.y + my && p.y <= r.y + r.h - my;
       };
       if (allowOnto) {
+        // Quotes: anywhere on an image means onto it. In the gaps between cards
+        // nothing changes, so the wall does not reshuffle under the pointer.
+        let nearest = Infinity;
+        let overCard = false;
         for (const item of current.display) {
           const r = current.layout.rects[item.id];
-          if (r && !current.ghosts.has(item.id) && item.front.kind === 'image' && inside(r, ONTO_CORE)) {
-            return { kind: 'onto', itemId: item.id };
+          if (!r || current.ghosts.has(item.id)) continue;
+          if (inside(r)) {
+            if (item.front.kind === 'image') return { kind: 'onto', itemId: item.id };
+            overCard = true;
           }
+          const dx = Math.max(r.x - p.x, 0, p.x - (r.x + r.w));
+          const dy = Math.max(r.y - p.y, 0, p.y - (r.y + r.h));
+          nearest = Math.min(nearest, Math.hypot(dx, dy));
+        }
+        if (!overCard && nearest <= GAP_HOLD) {
+          if (current.onto) return { kind: 'onto', itemId: current.onto };
+          if (current.point) return { kind: 'insert', point: current.point };
         }
       }
       if (current.point) {
@@ -220,7 +237,6 @@ export function Wall({ onUploadRequest }: { onUploadRequest(): void }) {
   };
 
   const background = board.theme.background;
-  const wallStyle = background.kind !== 'image' ? { background: background.value } : undefined;
 
   const padding = effectivePadding(params.padding, width);
   const top = viewport.top - viewport.height;
@@ -236,86 +252,108 @@ export function Wall({ onUploadRequest }: { onUploadRequest(): void }) {
   const empty = board.items.length === 0 && board.sections.length === 0 && !point;
 
   return (
-    <div
-      ref={scroller}
-      className="relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto outline-none"
-      style={wallStyle}
-      tabIndex={-1}
-      onKeyDown={onKeyDown}
-      onDragOver={onNativeOver}
-      onDragLeave={onNativeLeave}
-      onDrop={(e) => void onNativeDrop(e)}
-      data-testid="wall"
-      data-mode={mode}
-    >
-      {layout && (
-        <div
-          className="relative"
-          style={{ height: layout.height + (editing ? ADD_ZONE_HEIGHT : 0) + padding }}
-          onClick={(e) => e.target === e.currentTarget && useEditor.getState().clear()}
-        >
-          {/* Only cards live in the listbox; headers, drop areas and buttons are its siblings. */}
+    <div className="relative flex min-h-0 flex-1 flex-col" style={wallInkVars(background)}>
+      <WallBackground background={background} />
+      <div
+        ref={scroller}
+        className="relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto outline-none"
+        tabIndex={-1}
+        onKeyDown={onKeyDown}
+        onDragOver={onNativeOver}
+        onDragLeave={onNativeLeave}
+        onDrop={(e) => void onNativeDrop(e)}
+        data-testid="wall"
+        data-mode={mode}
+        data-drop-onto={onto ?? undefined}
+        data-drop-index={point?.index}
+      >
+        {layout && (
           <div
-            role={editing ? 'listbox' : 'list'}
-            aria-label={t('wall.label')}
-            aria-multiselectable={editing || undefined}
-            className="absolute inset-0"
+            className="relative"
+            style={{ height: layout.height + (editing ? ADD_ZONE_HEIGHT : 0) + padding }}
             onClick={(e) => e.target === e.currentTarget && useEditor.getState().clear()}
           >
-            {visible.map((item) => (
-              <WallCard
-                key={item.id}
-                item={byId.get(item.id)!}
-                rect={layout.rects[item.id]!}
-                lookup={lookup}
-                mode={mode}
-                selected={selected.has(item.id)}
-                flipped={flipped.has(item.id)}
-                placeholder={ghosts.has(item.id)}
-                dropOnto={onto === item.id}
+            {/* Only cards live in the listbox; headers, drop areas and buttons are its siblings. */}
+            <div
+              role={editing ? 'listbox' : 'list'}
+              aria-label={t('wall.label')}
+              aria-multiselectable={editing || undefined}
+              className="absolute inset-0"
+              onClick={(e) => e.target === e.currentTarget && useEditor.getState().clear()}
+            >
+              {visible.map((item) => (
+                <WallCard
+                  key={item.id}
+                  item={byId.get(item.id)!}
+                  rect={layout.rects[item.id]!}
+                  lookup={lookup}
+                  mode={mode}
+                  selected={selected.has(item.id)}
+                  flipped={flipped.has(item.id)}
+                  placeholder={ghosts.has(item.id)}
+                  dropOnto={onto === item.id}
+                />
+              ))}
+            </div>
+            {layout.headers.map((h) => (
+              <SectionHeaderView
+                key={h.sectionId}
+                sectionId={h.sectionId}
+                y={h.y}
+                x={padding}
+                width={width - padding * 2}
+                editable={editing}
               />
             ))}
+            {editing &&
+              layout.blocks
+                ?.filter((b) => b.sectionId && !b.itemIds.length)
+                .map((b) => (
+                  <div
+                    key={`empty-${b.sectionId}`}
+                    className="pointer-events-none absolute flex items-center justify-center rounded-lg border border-dashed border-wall-line text-[13px] text-wall-muted"
+                    style={{ left: padding, width: width - padding * 2, top: b.top + HEADER_HEIGHT, height: EMPTY_SECTION_HEIGHT - 8 }}
+                  >
+                    {t('wall.emptySection')}
+                  </div>
+                ))}
+            <QuoteDropChooser layout={layout} />
+            {editing && !empty && (
+              <button
+                type="button"
+                onClick={onUploadRequest}
+                className="absolute flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-wall-line text-wall-muted transition-colors duration-(--vb-fast) hover:border-wall-muted hover:text-wall-ink"
+                style={{ left: padding, width: width - padding * 2, top: layout.height, height: ADD_ZONE_HEIGHT - 16 }}
+              >
+                <span className="flex items-center gap-1.5 text-sm font-medium">
+                  <PlusIcon size={16} />
+                  {t('wall.addMore')}
+                </span>
+                <span className="text-[12px] opacity-75">{t('wall.addMoreHint')}</span>
+              </button>
+            )}
           </div>
-          {layout.headers.map((h) => (
-            <SectionHeaderView
-              key={h.sectionId}
-              sectionId={h.sectionId}
-              y={h.y}
-              x={padding}
-              width={width - padding * 2}
-              editable={editing}
-            />
-          ))}
-          {editing &&
-            layout.blocks
-              ?.filter((b) => b.sectionId && !b.itemIds.length)
-              .map((b) => (
-                <div
-                  key={`empty-${b.sectionId}`}
-                  className="pointer-events-none absolute flex items-center justify-center rounded-lg border border-dashed border-line text-[13px] text-faint"
-                  style={{ left: padding, width: width - padding * 2, top: b.top + HEADER_HEIGHT, height: EMPTY_SECTION_HEIGHT - 8 }}
-                >
-                  {t('wall.emptySection')}
-                </div>
-              ))}
-          <QuoteDropChooser layout={layout} />
-          {editing && !empty && (
-            <button
-              type="button"
-              onClick={onUploadRequest}
-              className="absolute flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-line text-muted transition-colors duration-(--vb-fast) hover:border-faint hover:text-ink"
-              style={{ left: padding, width: width - padding * 2, top: layout.height, height: ADD_ZONE_HEIGHT - 16 }}
-            >
-              <span className="flex items-center gap-1.5 text-sm font-medium">
-                <PlusIcon size={16} />
-                {t('wall.addMore')}
-              </span>
-              <span className="text-[12px] text-faint">{t('wall.addMoreHint')}</span>
-            </button>
-          )}
-        </div>
-      )}
-      {empty && editing && <EmptyWall onUploadRequest={onUploadRequest} />}
+        )}
+        {empty && editing && <EmptyWall onUploadRequest={onUploadRequest} />}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The board background, fixed behind the scrolling wall: a long wall scrolls
+ * over it instead of stretching one image across thousands of pixels.
+ */
+function WallBackground({ background }: { background: BoardBackground }) {
+  const asset = useLibrary((s) => (background.kind === 'image' ? s.assets.find((a) => a.id === background.assetId) : undefined));
+  const url = useBlobUrl(asset?.fullBlobId);
+  if (background.kind !== 'image') {
+    return <div className="pointer-events-none absolute inset-0" style={{ background: background.value }} data-testid="wall-background" />;
+  }
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden bg-board" data-testid="wall-background">
+      {url && <img src={url} alt="" className="h-full w-full object-cover" />}
+      <div className="absolute inset-0 bg-bg" style={{ opacity: background.dim ?? 0 }} />
     </div>
   );
 }
@@ -324,8 +362,8 @@ function EmptyWall({ onUploadRequest }: { onUploadRequest(): void }) {
   const t = useT();
   return (
     <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
-      <p className="font-serif text-2xl italic">{t('board.empty.title')}</p>
-      <p className="mt-2 max-w-sm text-muted">{t('board.empty.body')}</p>
+      <p className="font-serif text-2xl text-wall-ink italic">{t('board.empty.title')}</p>
+      <p className="mt-2 max-w-sm text-wall-muted">{t('board.empty.body')}</p>
       <div className="pointer-events-auto mt-6 flex gap-2">
         <button
           type="button"
@@ -382,8 +420,15 @@ function QuoteDropChooser({ layout }: { layout: ComputedLayout }) {
   const rect = layout.rects[choice.itemId];
   if (!rect) return null;
 
-  const place = (where: 'over' | 'back') => {
+  const place = (where: 'over' | 'back' | 'card') => {
     const { itemId, quoteId } = choice;
+    if (where === 'card') {
+      const index = useBoard.getState().board?.items.findIndex((i) => i.id === itemId) ?? -1;
+      const sectionId = useBoard.getState().board?.items[index]?.sectionId;
+      addQuotesToBoard([quoteId], { index: index + 1, sectionId });
+      useEditor.getState().setQuoteDrop(null);
+      return;
+    }
     useBoard.getState().update((b) => {
       if (where === 'over') setOverlay(b, itemId, { source: { quoteId }, ...DEFAULT_OVERLAY });
       else setBack(b, itemId, { kind: 'quote', quoteId });
@@ -406,6 +451,9 @@ function QuoteDropChooser({ layout }: { layout: ComputedLayout }) {
       <button type="button" {...choose(() => place('back'))} className="rounded-md px-3 py-2 text-left text-sm hover:bg-surface-2 focus:bg-surface-2 focus:outline-none">
         {t('quoteDrop.back')}
       </button>
+      <button type="button" {...choose(() => place('card'))} className="rounded-md px-3 py-2 text-left text-sm text-muted hover:bg-surface-2 hover:text-ink focus:bg-surface-2 focus:outline-none">
+        {t('quoteDrop.card')}
+      </button>
     </div>
   );
 }
@@ -423,7 +471,7 @@ function SectionHeaderView({ sectionId, x, y, width, editable }: { sectionId: ID
   const locale = useLocale((s) => s.locale);
   const section = useBoard((s) => s.board?.sections.find((sec) => sec.id === sectionId));
   const style = { transform: `translate(${x}px, ${y}px)`, width, height: HEADER_HEIGHT };
-  const className = 'absolute top-0 left-0 flex items-end border-b border-line pb-2 transition-transform duration-200 ease-calm';
+  const className = 'absolute top-0 left-0 flex items-end border-b border-wall-line pb-2 text-wall-ink transition-transform duration-200 ease-calm';
 
   if (sectionId.startsWith(MONTH_PREFIX) || !editable) {
     const title = sectionId.startsWith(MONTH_PREFIX) ? monthLabel(locale, sectionId) : section?.title || t('wall.untitledSection');
@@ -441,7 +489,7 @@ function SectionHeaderView({ sectionId, x, y, width, editable }: { sectionId: ID
         aria-label={t('wall.sectionTitle')}
         onChange={(e) => useBoard.getState().update((b) => renameSection(b, sectionId, e.target.value))}
         onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-        className="w-full min-w-0 rounded border border-transparent bg-transparent px-1 font-serif text-2xl placeholder:text-faint hover:border-line focus:border-line"
+        className="w-full min-w-0 rounded border border-transparent bg-transparent px-1 font-serif text-2xl text-wall-ink placeholder:text-wall-muted hover:border-wall-line focus:border-wall-line"
       />
     </div>
   );

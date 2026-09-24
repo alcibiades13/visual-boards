@@ -54,21 +54,24 @@ async function setup(page: Page) {
 }
 
 
-/** Drags onto a card, re-aiming once the other cards have made room (as a person would). */
+/**
+ * Drags to a target, re-aiming while the other cards make room, as a person
+ * would. For an image card it waits until that card shows the "drop on the
+ * image" highlight before letting go.
+ */
 async function dragOnto(page: Page, from: Locator, target: Locator) {
   const box = (await from.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + 12);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width / 2 + 12, box.y + 16, { steps: 3 });
-  let to = await center(target);
-  await page.mouse.move(to.x, to.y, { steps: 15 });
-  await page.waitForTimeout(350);
-  to = await center(target);
-  await page.mouse.move(to.x, to.y, { steps: 5 });
-  await page.waitForTimeout(350);
-  to = await center(target);
-  await page.mouse.move(to.x, to.y, { steps: 3 });
-  await page.waitForTimeout(150);
+  const onImage = (await target.getAttribute('data-item-id')) !== null;
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const to = await center(target);
+    await page.mouse.move(to.x, to.y, { steps: attempt ? 3 : 15 });
+    await page.waitForTimeout(300);
+    if (!onImage || (await target.getByText('Drop on the image').count())) break;
+  }
+  if (onImage) await expect(target.getByText('Drop on the image')).toBeVisible();
   await page.mouse.up();
   await page.waitForTimeout(100);
 }
@@ -125,6 +128,17 @@ test.describe('cards (desktop)', () => {
     expect(cleared.find((i) => i.id === img1)!.front.overlay).toBeUndefined();
     expect(cleared.find((i) => i.id === img2)!.back).toBeUndefined();
     await expect(page.getByTestId('quote-card')).toHaveCount(2);
+  });
+
+  test('a quote dropped on an image can also become a separate card right after it', async ({ page }) => {
+    await setup(page);
+    const [img] = (await savedItems(page)).map((i) => i.id);
+    await dragOnto(page, quote(page, 'journey'), page.locator(`[data-item-id="${img}"]`));
+    await page.getByRole('dialog', { name: 'Place the quote' }).getByRole('button', { name: 'As a separate card' }).click();
+    await expect(cards(page)).toHaveCount(4);
+    const items = await savedItems(page);
+    expect(items.map((i) => i.front.kind)).toEqual(['image', 'quote', 'image', 'image']);
+    expect(items[0]!.front.overlay).toBeUndefined();
   });
 
   test('overlay: 9 positions, 7 effects, intensity, auto size with a warning for long text', async ({ page }) => {
