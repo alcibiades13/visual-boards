@@ -9,6 +9,12 @@ export interface BoardRepo {
   list(): Promise<Board[]>;
   get(id: ID): Promise<Board | undefined>;
   put(board: Board): Promise<void>;
+  /**
+   * Starts the write synchronously, for page hide/unload where awaiting is not
+   * possible: the browser commits a transaction that was already created.
+   * Returns false when that is not possible (database not open yet).
+   */
+  putNow(board: Board): boolean;
   delete(id: ID): Promise<void>;
 }
 

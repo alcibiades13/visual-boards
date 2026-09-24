@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { translate, useLocale } from '@/i18n';
 import { isImageFile } from '@/images/sniff';
 import { uploadImages, type UploadContext } from '@/images/upload';
+import type { ImageAsset } from '@/model';
 import { useLibrary } from './libraryStore';
 import { toast } from './toastStore';
 
@@ -15,7 +16,12 @@ interface UploadState {
   added: number;
   duplicates: number;
   failed: number;
-  start(files: File[]): void;
+  /**
+   * Uploads files into the library. `onAsset` receives every image in order of
+   * completion, including ones that were already in the library (e.g. to place
+   * them on a board where they were dropped).
+   */
+  start(files: File[], options?: { onAsset?(asset: ImageAsset): void }): void;
   cancel(): void;
 }
 
@@ -34,7 +40,7 @@ export const useUpload = create<UploadState>((set, get) => ({
   duplicates: 0,
   failed: 0,
 
-  start: (input) => {
+  start: (input, options) => {
     const files = input.filter(isImageFile);
     const skipped = input.length - files.length;
     if (skipped > 0) toast(t('upload.notImages', { count: skipped }));
@@ -58,6 +64,8 @@ export const useUpload = create<UploadState>((set, get) => ({
         failed: s.failed + (outcome.kind === 'failed' ? 1 : 0),
       });
       if (outcome.kind === 'added') useLibrary.getState().assetAdded(outcome.asset);
+      if (outcome.kind === 'added') options?.onAsset?.(outcome.asset);
+      if (outcome.kind === 'duplicate' && outcome.existing) options?.onAsset?.(outcome.existing);
       if (outcome.kind === 'failed') console.warn('Upload failed', outcome.fileName, outcome.reason);
     }).finally(() => {
       running -= 1;

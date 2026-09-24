@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useT } from '@/i18n';
 import { toast } from '@/store/toastStore';
+import { useIntake } from '@/store/intakeStore';
 import { useUpload } from '@/store/uploadStore';
 import { UploadIcon } from '@/ui/icons';
 import { fetchRemoteImage, filesFromDataTransfer, isImageDrag, remoteImageUrl } from './dataTransfer';
@@ -28,7 +29,8 @@ export function GlobalDrop() {
       if (!isImageDrag(e.dataTransfer)) return;
       e.preventDefault();
       depth.current += 1;
-      setVisible(true);
+      // In the editor the board shows where a drop will land; no full-window overlay.
+      setVisible(!useIntake.getState().target);
     };
     const onDragOver = (e: DragEvent) => {
       if (!isImageDrag(e.dataTransfer)) return;
@@ -61,15 +63,27 @@ export function GlobalDrop() {
       // Text fields keep normal text paste, but a pasted image still goes to the library.
       if (isEditable(e.target) && e.clipboardData?.types.includes('text/plain')) return;
       e.preventDefault();
-      start(files.map((f, i) => (f.name && f.name !== 'image.png' ? f : new File([f], `pasted-${Date.now()}-${i}.png`, { type: f.type }))));
+      const named = files.map((f, i) =>
+        f.name && f.name !== 'image.png' ? f : new File([f], `pasted-${Date.now()}-${i}.png`, { type: f.type }),
+      );
+      const target = useIntake.getState().target;
+      if (target) target(named);
+      else start(named);
     };
 
+    // Drops handled by the board never bubble here; reset the overlay anyway.
+    const onAnyDrop = () => {
+      depth.current = 0;
+      setVisible(false);
+    };
+    window.addEventListener('drop', onAnyDrop, true);
     window.addEventListener('dragenter', onDragEnter);
     window.addEventListener('dragover', onDragOver);
     window.addEventListener('dragleave', onDragLeave);
     window.addEventListener('drop', onDrop);
     window.addEventListener('paste', onPaste);
     return () => {
+      window.removeEventListener('drop', onAnyDrop, true);
       window.removeEventListener('dragenter', onDragEnter);
       window.removeEventListener('dragover', onDragOver);
       window.removeEventListener('dragleave', onDragLeave);

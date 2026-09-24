@@ -5,7 +5,7 @@ import { EMPTY_SELECTION, select, type Selection, type SelectMode } from '@/feat
 // navigation and is shared once the panel is embedded in the editor.
 
 export type LibraryTab = 'images' | 'quotes';
-export type LibraryFilter = 'all' | 'favorites';
+export type LibraryFilter = 'all' | 'favorites' | 'unused'; // 'unused' = not on the open board
 export type LibrarySort = 'newest' | 'oldest' | 'name';
 export type ThumbSize = 1 | 2 | 3; // small → large
 

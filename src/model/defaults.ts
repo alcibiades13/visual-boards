@@ -30,7 +30,7 @@ export const THEME_TEXT_COLOR = 'var(--vb-ink)';
 
 export const DEFAULT_MASONRY_PARAMS: MasonryParams = {
   columns: 'auto',
-  minColumnWidth: 260,
+  minColumnWidth: 240,
   padding: 24,
   monthDividers: false,
 };

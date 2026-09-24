@@ -17,7 +17,11 @@ interface BoardState {
   update(recipe: (draft: Board) => void): void;
 }
 
-const saver = createSaver<Board>((board) => getRepos().boards.put(board));
+const saver = createSaver<Board>(
+  (board) => getRepos().boards.put(board),
+  500,
+  (board) => getRepos().boards.putNow(board),
+);
 
 export const useBoard = create<BoardState>((set, get) => ({
   board: null,

@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { addAssetsToBoard } from '@/features/board/actions';
 import { useT } from '@/i18n';
 import { columnCount, packColumns } from '@/layout/columns';
-import type { ImageAsset } from '@/model';
+import { boardContent, type ImageAsset } from '@/model';
+import { useBoard } from '@/store/boardStore';
 import { countBoardsUsing, useLibrary } from '@/store/libraryStore';
 import { useLibraryView, type LibrarySort, type ThumbSize } from '@/store/libraryViewStore';
 import { Button } from '@/ui/Button';
 import { confirmDialog } from '@/ui/confirmStore';
-import { ImagesIcon, StarIcon, TrashIcon } from '@/ui/icons';
+import { ImagesIcon, PlusIcon, StarIcon, TrashIcon } from '@/ui/icons';
+import { toast } from '@/store/toastStore';
 import { pruneSelection, type SelectMode } from './selection';
 import { sortAssets } from './sortAssets';
 import { EmptyState } from '@/ui/EmptyState';
@@ -21,10 +24,16 @@ export function ImageLibrary() {
   const t = useT();
   const assets = useLibrary((s) => s.assets);
   const loaded = useLibrary((s) => s.loaded);
-  const { filter, sort, size, selection, selectionMode } = useLibraryView();
+  const { filter: chosenFilter, sort, size, selection, selectionMode } = useLibraryView();
   const view = useLibraryView.getState;
+  const boardItems = useBoard((s) => s.board?.items);
+  const onBoard = useMemo(
+    () => (boardItems ? new Set(boardContent({ items: boardItems }).assetIds) : undefined),
+    [boardItems],
+  );
+  const filter = chosenFilter === 'unused' && !onBoard ? 'all' : chosenFilter;
 
-  const visible = useMemo(() => sortAssets(assets, filter, sort), [assets, filter, sort]);
+  const visible = useMemo(() => sortAssets(assets, filter, sort, onBoard), [assets, filter, sort, onBoard]);
   const order = useMemo(() => visible.map((a) => a.id), [visible]);
 
   // Keep the selection in sync with what is visible (deletes, filter changes).
@@ -51,6 +60,12 @@ export function ImageLibrary() {
     view().clearSelection();
   }, [t, view]);
 
+  const addToBoard = (ids: string[]) => {
+    addAssetsToBoard(ids);
+    toast(t('library.added', { count: ids.length }));
+  };
+  const unused = onBoard ? sortAssets(assets, 'unused', sort, onBoard) : [];
+
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
@@ -73,6 +88,7 @@ export function ImageLibrary() {
           onChange={(filter) => view().set({ filter })}
           options={[
             ['all', t('library.filter.all')],
+            ...(onBoard ? [['unused', t('library.filter.unused')] as ['unused', string]] : []),
             ['favorites', t('library.filter.favorites')],
           ]}
         />
@@ -108,6 +124,20 @@ export function ImageLibrary() {
           <span className="mr-auto pl-1 text-[13px] font-medium" data-testid="selection-count">
             {t('library.selected', { count: selection.ids.size })}
           </span>
+          {onBoard && (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={!selectedAssets.length}
+              onClick={() => {
+                addToBoard(selectedAssets.map((a) => a.id));
+                view().clearSelection();
+              }}
+            >
+              <PlusIcon size={15} />
+              <span className="hidden sm:inline">{t('library.addToBoard')}</span>
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -133,9 +163,16 @@ export function ImageLibrary() {
       ) : (
         <div className="flex items-center justify-between border-y border-transparent py-1.5 text-[13px] text-muted">
           <span className="pl-1">{t('library.count.images', { count: visible.length })}</span>
-          <Button variant="ghost" size="sm" disabled={!visible.length} onClick={() => view().setSelection(order)}>
-            {t('library.selectAll')}
-          </Button>
+          <span className="flex">
+            {onBoard && (
+              <Button variant="ghost" size="sm" disabled={!unused.length} onClick={() => addToBoard(unused.map((a) => a.id))}>
+                {t('library.addUnused')}
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" disabled={!visible.length} onClick={() => view().setSelection(order)}>
+              {t('library.selectAll')}
+            </Button>
+          </span>
         </div>
       )}
 
@@ -144,13 +181,23 @@ export function ImageLibrary() {
       ) : loaded && visible.length === 0 ? (
         <EmptyState body={t('library.empty.filtered')} />
       ) : (
-        <ImageGrid assets={visible} order={order} />
+        <ImageGrid assets={visible} order={order} onBoard={onBoard} onActivate={(id) => addToBoard([id])} />
       )}
     </div>
   );
 }
 
-function ImageGrid({ assets, order }: { assets: ImageAsset[]; order: string[] }) {
+function ImageGrid({
+  assets,
+  order,
+  onBoard,
+  onActivate,
+}: {
+  assets: ImageAsset[];
+  order: string[];
+  onBoard: ReadonlySet<string> | undefined;
+  onActivate(id: string): void;
+}) {
   const t = useT();
   const scroller = useRef<HTMLDivElement>(null);
   const width = useElementWidth(scroller);
@@ -215,6 +262,9 @@ function ImageGrid({ assets, order }: { assets: ImageAsset[]; order: string[] })
               onSelect={onSelect}
               onLongPress={onLongPress}
               onToggleFavorite={onToggleFavorite}
+              boardOpen={!!onBoard}
+              onBoard={!!onBoard?.has(r.id)}
+              onActivate={onActivate}
             />
           );
         })}

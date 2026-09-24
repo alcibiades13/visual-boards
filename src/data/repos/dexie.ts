@@ -8,6 +8,17 @@ function boardRepo(db: VisualBoardsDB): BoardRepo {
     put: async (board) => {
       await db.boards.put(board);
     },
+    putNow: (board) => {
+      if (!db.isOpen()) return false;
+      try {
+        const tx = db.backendDB().transaction('boards', 'readwrite');
+        tx.objectStore('boards').put(board);
+        tx.commit?.();
+        return true;
+      } catch {
+        return false;
+      }
+    },
     delete: (id) => db.boards.delete(id),
   };
 }

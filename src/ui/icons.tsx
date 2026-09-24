@@ -82,3 +82,16 @@ export const PlusIcon = (p: IconProps) => (
     <path d="M10 4v12M4 10h12" />
   </Icon>
 );
+export const SlidersIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 6h7M15 6h1M4 14h1M9 14h7" />
+    <circle cx="13" cy="6" r="2" />
+    <circle cx="7" cy="14" r="2" />
+  </Icon>
+);
+export const SidebarIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="3" y="4" width="14" height="12" rx="1.5" />
+    <path d="M8 4v12" />
+  </Icon>
+);

@@ -68,6 +68,13 @@ test('a title change survives closing the tab right away', async ({ page, contex
   await expect(again.getByRole('textbox', { name: 'Board name' })).toHaveValue('Saved on close');
 });
 
+test('a change survives an immediate reload', async ({ page }) => {
+  await createBoard(page, 'Draft', 'Blank');
+  await page.getByRole('textbox', { name: 'Board name' }).fill('Saved on reload');
+  await page.reload();
+  await expect(page.getByRole('textbox', { name: 'Board name' })).toHaveValue('Saved on reload');
+});
+
 test('backup: import into an empty app, export, and import again gives an identical state', async ({ page, browser }) => {
   await importBackup(page, 'tests/fixtures/backup-v1.zip');
   await expect(page.getByRole('status').filter({ hasText: 'Imported 2 boards, 3 images and 2 quotes.' })).toBeVisible();

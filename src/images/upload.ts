@@ -11,7 +11,7 @@ import { isHeicBytes } from './sniff';
 
 export type UploadOutcome =
   | { kind: 'added'; asset: ImageAsset }
-  | { kind: 'duplicate'; fileName: string }
+  | { kind: 'duplicate'; fileName: string; existing?: ImageAsset }
   | { kind: 'failed'; fileName: string; reason: string }
   | { kind: 'cancelled'; fileName: string };
 
@@ -46,7 +46,9 @@ async function uploadOne(file: File, ctx: UploadContext): Promise<UploadOutcome>
     const bytes = await file.arrayBuffer();
     const hash = await sha256Hex(bytes);
     const repo = getRepos().assets;
-    if (ctx.seen.has(hash) || (await repo.findByHash(hash))) return { kind: 'duplicate', fileName };
+    if (ctx.seen.has(hash)) return { kind: 'duplicate', fileName };
+    const existing = await repo.findByHash(hash);
+    if (existing) return { kind: 'duplicate', fileName, existing };
     ctx.seen.add(hash);
     if (ctx.signal.aborted) {
       ctx.seen.delete(hash);

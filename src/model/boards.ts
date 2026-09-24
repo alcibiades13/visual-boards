@@ -2,7 +2,7 @@ import { newId, nowIso } from './defaults';
 import type { Board, Face, ID } from './types';
 
 /** Distinct library images and quotes used on a board (fronts, backs and overlays). */
-export function boardContent(board: Board): { assetIds: ID[]; quoteIds: ID[] } {
+export function boardContent(board: Pick<Board, 'items'>): { assetIds: ID[]; quoteIds: ID[] } {
   const assets = new Set<ID>();
   const quotes = new Set<ID>();
   const visit = (face: Face | undefined) => {

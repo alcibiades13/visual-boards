@@ -1,8 +1,11 @@
+import { useDraggable } from '@dnd-kit/core';
 import { memo, useRef } from 'react';
+import type { DragData } from '@/features/board/EditorDnd';
 import { useT } from '@/i18n';
 import { useBlobUrl } from '@/images/blobUrls';
 import type { ImageAsset } from '@/model';
 import type { SelectMode } from './selection';
+import { clickSuppressed } from '@/store/dragStore';
 import { CheckIcon, StarIcon } from '@/ui/icons';
 
 const LONG_PRESS_MS = 450;
@@ -16,9 +19,13 @@ interface ThumbnailProps {
   h: number;
   selected: boolean;
   selectionMode: boolean;
+  /** A board is open: the thumbnail can be dragged onto it, tapped or double-clicked to add it. */
+  boardOpen: boolean;
+  onBoard: boolean;
   onSelect(id: string, mode: SelectMode): void;
   onLongPress(id: string): void;
   onToggleFavorite(asset: ImageAsset): void;
+  onActivate(id: string): void;
 }
 
 export const Thumbnail = memo(function Thumbnail({
@@ -29,12 +36,18 @@ export const Thumbnail = memo(function Thumbnail({
   h,
   selected,
   selectionMode,
+  boardOpen,
+  onBoard,
   onSelect,
   onLongPress,
   onToggleFavorite,
+  onActivate,
 }: ThumbnailProps) {
   const t = useT();
   const url = useBlobUrl(asset.thumbBlobId);
+  const data: DragData = { kind: 'asset', assetId: asset.id };
+  // With a board open, drag & drop owns the long press (see EditorDnd).
+  const { setNodeRef, listeners, attributes } = useDraggable({ id: `asset:${asset.id}`, data, disabled: !boardOpen });
   const press = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null);
   const suppressClick = useRef(false);
   const pointerType = useRef('mouse');
@@ -46,6 +59,9 @@ export const Thumbnail = memo(function Thumbnail({
 
   return (
     <div
+      ref={setNodeRef}
+      {...(boardOpen ? attributes : {})}
+      {...(boardOpen ? listeners : {})}
       role="option"
       aria-selected={selected}
       aria-label={t('library.image', { name: asset.fileName })}
@@ -55,7 +71,7 @@ export const Thumbnail = memo(function Thumbnail({
       style={{ width: w, height: h, transform: `translate(${x}px, ${y}px)` }}
       onPointerDown={(e) => {
         pointerType.current = e.pointerType;
-        if (e.pointerType !== 'touch') return;
+        if (e.pointerType !== 'touch' || boardOpen) return;
         const start = { x: e.clientX, y: e.clientY };
         press.current = {
           ...start,
@@ -75,16 +91,18 @@ export const Thumbnail = memo(function Thumbnail({
       onPointerCancel={cancelPress}
       onContextMenu={(e) => pointerType.current === 'touch' && e.preventDefault()}
       onClick={(e) => {
-        if (suppressClick.current) {
+        if (suppressClick.current || clickSuppressed()) {
           suppressClick.current = false;
           return;
         }
         if (pointerType.current === 'touch') {
           if (selectionMode) onSelect(asset.id, 'toggle');
-          return; // plain taps get their board action in M3
+          else if (boardOpen) onActivate(asset.id); // phone: tap adds to the end of the board
+          return;
         }
         onSelect(asset.id, e.shiftKey ? 'range' : e.metaKey || e.ctrlKey ? 'toggle' : 'replace');
       }}
+      onDoubleClick={() => boardOpen && pointerType.current !== 'touch' && onActivate(asset.id)}
       onKeyDown={(e) => {
         if (e.key === ' ' || e.key === 'Enter') {
           e.preventDefault();
@@ -99,6 +117,14 @@ export const Thumbnail = memo(function Thumbnail({
       >
         {url && <img src={url} alt="" draggable={false} decoding="async" className="h-full w-full object-cover" />}
       </div>
+
+      {onBoard && (
+        <span
+          title={t('library.onBoard')}
+          aria-label={t('library.onBoard')}
+          className="absolute right-1.5 bottom-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-accent shadow-soft"
+        />
+      )}
 
       {(selected || selectionMode) && (
         <span

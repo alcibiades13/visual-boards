@@ -1,5 +1,16 @@
 # Changelog
 
+## M3 — Masonry wall (2026-09-24)
+
+- Layout engine interface and the masonry engine: shortest-column packing, span 1–3, auto/manual columns, sections as full-width blocks, month dividers. Pure and unit-tested, including "no gaps larger than the spacing" and hit testing.
+- Board editor: library sidebar (resizable, hideable) with drag onto the wall, wall in the middle, inspector on the right; drawers on tablet and phone.
+- Drag & drop with dnd-kit: one or many images from the library to the exact drop position; reorder cards with animated reflow; mouse and long-press touch.
+- Virtualized wall: only cards near the viewport are mounted; card sizes are known up front so nothing shifts while images load (1000 cards tested).
+- Library on a board: "on this board" marks, "Not on board" filter, "Add all unused", "Add to board", tap/double-click to add.
+- Files dropped on the wall land at the drop position; pasted images go to the board as well.
+- Board operations (insert, move, remove, span, sections) as pure, tested functions.
+- Fix: changes are written synchronously when the page is hidden or reloaded.
+
 ## M2 — Boards and backup (2026-09-24)
 
 - Dashboard: board cards with cover (chosen cover or first images), image/quote counts and relative edit time; rename, duplicate and delete from a card menu.

@@ -82,3 +82,12 @@ describe('MetaRepo', () => {
     expect(await repos.meta.get<{ n: number }>('x')).toEqual({ n: 1 });
   });
 });
+
+describe('BoardRepo.putNow', () => {
+  it('starts a write synchronously once the database is open', async () => {
+    const board = createBoard({ title: 'Now' });
+    expect(repos.boards.putNow(board)).toBe(true);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(await repos.boards.get(board.id)).toEqual(board);
+  });
+});
