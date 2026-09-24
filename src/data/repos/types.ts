@@ -1,0 +1,47 @@
+import type { Board, ID, ImageAsset, Quote } from '@/model';
+
+// Repository interfaces (blueprint §3). The UI depends only on these, so the
+// IndexedDB implementation can later be replaced or backed by a cloud sync.
+
+export interface BoardRepo {
+  list(): Promise<Board[]>;
+  get(id: ID): Promise<Board | undefined>;
+  put(board: Board): Promise<void>;
+  delete(id: ID): Promise<void>;
+}
+
+export interface AssetRepo {
+  list(): Promise<ImageAsset[]>;
+  get(id: ID): Promise<ImageAsset | undefined>;
+  findByHash(hash: string): Promise<ImageAsset | undefined>;
+  /** Stores the asset together with its full and thumbnail blobs atomically. */
+  add(asset: ImageAsset, blobs: { full: Blob; thumb: Blob }): Promise<void>;
+  update(id: ID, patch: Partial<Omit<ImageAsset, 'id'>>): Promise<void>;
+  /** Removes the asset and its blobs. */
+  delete(ids: ID[]): Promise<void>;
+}
+
+export interface QuoteRepo {
+  list(): Promise<Quote[]>;
+  get(id: ID): Promise<Quote | undefined>;
+  addMany(quotes: Quote[]): Promise<void>;
+  update(id: ID, patch: Partial<Omit<Quote, 'id'>>): Promise<void>;
+  delete(ids: ID[]): Promise<void>;
+}
+
+export interface BlobRepo {
+  get(id: ID): Promise<Blob | undefined>;
+}
+
+export interface MetaRepo {
+  get<T>(key: string): Promise<T | undefined>;
+  set<T>(key: string, value: T): Promise<void>;
+}
+
+export interface Repos {
+  boards: BoardRepo;
+  assets: AssetRepo;
+  quotes: QuoteRepo;
+  blobs: BlobRepo;
+  meta: MetaRepo;
+}

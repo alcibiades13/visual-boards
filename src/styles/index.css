@@ -1,0 +1,47 @@
+@import 'tailwindcss';
+@import './tokens.css';
+
+/* Tailwind utilities map to the CSS variables, so no component hardcodes a color. */
+@theme inline {
+  --color-bg: var(--vb-bg);
+  --color-surface: var(--vb-surface);
+  --color-surface-2: var(--vb-surface-2);
+  --color-board: var(--vb-board);
+  --color-ink: var(--vb-ink);
+  --color-muted: var(--vb-muted);
+  --color-faint: var(--vb-faint);
+  --color-line: var(--vb-line);
+  --color-accent: var(--vb-accent);
+  --color-accent-ink: var(--vb-accent-ink);
+  --color-danger: var(--vb-danger);
+  --font-serif: var(--vb-font-serif);
+  --font-sans: var(--vb-font-sans);
+  --shadow-soft: var(--vb-shadow-soft);
+  --shadow-lifted: var(--vb-shadow-lifted);
+  --ease-calm: var(--vb-ease);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    margin: 0;
+    background: var(--vb-bg);
+    color: var(--vb-ink);
+    font-family: var(--vb-font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+  :focus-visible {
+    outline: 2px solid var(--vb-focus);
+    outline-offset: 2px;
+  }
+  button {
+    cursor: pointer;
+  }
+}
