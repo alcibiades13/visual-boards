@@ -50,3 +50,27 @@ export function useT() {
   const locale = useLocale((s) => s.locale);
   return (key: MessageKey, vars?: Record<string, string | number>) => translate(locale, key, vars);
 }
+
+const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
+  ['year', 31_536_000],
+  ['month', 2_592_000],
+  ['week', 604_800],
+  ['day', 86_400],
+  ['hour', 3_600],
+  ['minute', 60],
+];
+
+/** "3 hours ago" / "pre 3 sata". */
+export function formatRelative(locale: Locale, iso: string, now = Date.now()): string {
+  const seconds = (Date.parse(iso) - now) / 1000;
+  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+  for (const [unit, size] of UNITS) {
+    if (Math.abs(seconds) >= size) return rtf.format(Math.round(seconds / size), unit);
+  }
+  return rtf.format(0, 'minute');
+}
+
+export function useFormatRelative() {
+  const locale = useLocale((s) => s.locale);
+  return (iso: string) => formatRelative(locale, iso);
+}

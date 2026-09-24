@@ -28,3 +28,15 @@ Short notes on choices the blueprint does not cover. Newest last.
 - **Quote parser heuristics** (not specified in detail by the blueprint): an author must be ≤ 8 words / 80 chars, start with a capital letter and not end like a sentence; a plain hyphen counts as a separator only with whitespace (or a closing quote) before it. This keeps "The journey — not the destination — matters" and "well-being" intact. Leading list bullets (`-`, `•`, `1.`) are stripped. Duplicates are compared ignoring case, punctuation and spacing.
 - **Deferred to M4**: editing a quote in the library (the M4 criterion "a library edit shows on every card" is where it belongs). "Random quote" and "Add all unused" need a board and come with M3/M4.
 - **Plural forms** in UI strings use `one|other` (en) and `one|few|other` (sr) via `Intl.PluralRules`.
+
+## M2
+
+- **Board page is minimal until M3**: editable title (autosaved) and the empty-board call to action. The editor, library sidebar and layouts arrive in M3.
+- **Presets**: Inspiration Wall and Vision Board start in masonry; Moodboard starts in freeform (usable from M5); Blank starts in masonry. No preset changes the background yet: the theme default already fits all of them. The Vision Board section chips are in the UI language at creation time and are plain, renamable titles afterwards.
+- **Empty title** becomes "Untitled board" / "Board bez naziva".
+- **Duplicate** copies everything with a new board id; item ids are kept (they only need to be unique within a board).
+- **Autosave**: `createSaver` debounces 500 ms, writes are chained so an older state never overwrites a newer one, and pending changes are flushed on `visibilitychange: hidden`, `pagehide`, when leaving a board and before a backup. Undo/redo (Immer patches) is left for M6; `boardStore.update()` is the single entry point it will hook into.
+- **Backup format**: `data.json` (`format`, `version`, `exportedAt`, boards, assets, quotes, `blobs: id → {path, type}`) plus `images/<blobId>.<ext>`. Images are stored uncompressed in the zip (already compressed); only `data.json` is deflated. Output chunks are folded into Blobs every 32 MB so large libraries do not sit in one JS buffer.
+- **Import**: into an empty app it imports directly; otherwise the user chooses Merge or Replace. Replace is one IndexedDB transaction, so a failure leaves the old data intact. Merge matches images by hash and quotes by normalized text to existing ids and rewrites board references; for a board present on both sides the newer `updatedAt` wins. Assets whose image files are missing from the zip are dropped instead of imported broken. The zip is read with `unzipSync`: with stored (uncompressed) entries this is essentially a copy.
+- **Backup reminder**: shown when there are changes newer than the last backup and the last backup (or, if none, the first content) is older than 30 days. "Later" snoozes for 7 days. Exporting records `lastBackupAt` in the meta table.
+- **Old backups**: `tests/fixtures/backup-v1.zip` is a committed v1 backup that a unit test must keep loading after any schema change (`WRITE_FIXTURES=1` regenerates it only on purpose).

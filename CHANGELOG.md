@@ -1,5 +1,13 @@
 # Changelog
 
+## M2 — Boards and backup (2026-09-24)
+
+- Dashboard: board cards with cover (chosen cover or first images), image/quote counts and relative edit time; rename, duplicate and delete from a card menu.
+- New board dialog: name plus Inspiration Wall, Vision Board (optional sections), Moodboard or Blank.
+- Board page with an inline editable title and autosave (500 ms debounce, flushed on tab hide/close).
+- Backup: "Export everything" to a .zip (data.json + images), import with Merge or Replace, atomic replace, duplicate-free merge, reminder after 30 days with snooze.
+- Tests: autosave ordering, backup round-trip, merge remapping, reminder rules, loading a committed v1 backup; Playwright flows for board management, save-on-close, export → import into a fresh profile with identical data, invalid files and the reminder.
+
 ## M1 — Library and upload (2026-09-24)
 
 - Image pipeline in a pool of Web Workers: EXIF orientation, resize to 2400px, 640px thumbnail, WebP with JPEG fallback; HEIC via native decode or lazy heic2any.

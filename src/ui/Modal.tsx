@@ -6,8 +6,8 @@ interface ModalProps {
   onClose(): void;
   children: ReactNode;
   footer?: ReactNode;
-  /** 'dialog' is a small centered box; 'wide' fills most of the screen. Both become a sheet on phones. */
-  size?: 'dialog' | 'wide';
+  /** 'dialog' is a small box, 'medium' fits its content, 'wide' fills most of the screen. All become a sheet on phones. */
+  size?: 'dialog' | 'medium' | 'wide';
 }
 
 export function Modal({ title, onClose, children, footer, size = 'dialog' }: ModalProps) {
@@ -35,10 +35,11 @@ export function Modal({ title, onClose, children, footer, size = 'dialog' }: Mod
     };
   }, []);
 
-  const box =
-    size === 'wide'
-      ? 'h-[92dvh] w-full sm:h-[min(820px,90dvh)] sm:w-[min(1100px,94vw)]'
-      : 'max-h-[85dvh] w-full sm:w-[440px]';
+  const box = {
+    dialog: 'max-h-[85dvh] w-full sm:w-[440px]',
+    medium: 'max-h-[92dvh] w-full sm:max-h-[90dvh] sm:w-[min(820px,94vw)]',
+    wide: 'h-[92dvh] w-full sm:h-[min(820px,90dvh)] sm:w-[min(1100px,94vw)]',
+  }[size];
 
   return createPortal(
     <div

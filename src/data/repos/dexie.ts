@@ -1,5 +1,5 @@
 import type { VisualBoardsDB } from '../db';
-import type { AssetRepo, BlobRepo, BoardRepo, MetaRepo, QuoteRepo, Repos } from './types';
+import type { AssetRepo, BackupRepo, BlobRepo, BoardRepo, MetaRepo, QuoteRepo, Repos } from './types';
 
 function boardRepo(db: VisualBoardsDB): BoardRepo {
   return {
@@ -67,6 +67,44 @@ function metaRepo(db: VisualBoardsDB): MetaRepo {
   };
 }
 
+function backupRepo(db: VisualBoardsDB): BackupRepo {
+  const content = [db.boards, db.assets, db.quotes, db.blobs];
+  return {
+    snapshot: () =>
+      db.transaction('r', content, async () => {
+        const [boards, assets, quotes, blobs] = await Promise.all([
+          db.boards.toArray(),
+          db.assets.orderBy('createdAt').toArray(),
+          db.quotes.orderBy('createdAt').toArray(),
+          db.blobs.toArray(),
+        ]);
+        return { boards, assets, quotes, blobs: new Map(blobs.map((b) => [b.id, b.blob])) };
+      }),
+    isEmpty: async () => {
+      const counts = await Promise.all([db.boards.count(), db.assets.count(), db.quotes.count()]);
+      return counts.every((n) => n === 0);
+    },
+    replaceAll: (snapshot) =>
+      db.transaction('rw', content, async () => {
+        await Promise.all(content.map((table) => table.clear()));
+        await db.blobs.bulkAdd([...snapshot.blobs].map(([id, blob]) => ({ id, blob })));
+        await db.assets.bulkAdd(snapshot.assets);
+        await db.quotes.bulkAdd(snapshot.quotes);
+        await db.boards.bulkAdd(snapshot.boards);
+      }),
+    applyMerge: (plan, blobs) =>
+      db.transaction('rw', content, async () => {
+        await db.blobs.bulkPut(plan.blobIds.flatMap((id) => {
+          const blob = blobs.get(id);
+          return blob ? [{ id, blob }] : [];
+        }));
+        await db.assets.bulkAdd(plan.assets);
+        await db.quotes.bulkAdd(plan.quotes);
+        await db.boards.bulkPut(plan.boards);
+      }),
+  };
+}
+
 export function createDexieRepos(db: VisualBoardsDB): Repos {
   return {
     boards: boardRepo(db),
@@ -74,5 +112,6 @@ export function createDexieRepos(db: VisualBoardsDB): Repos {
     quotes: quoteRepo(db),
     blobs: blobRepo(db),
     meta: metaRepo(db),
+    backup: backupRepo(db),
   };
 }

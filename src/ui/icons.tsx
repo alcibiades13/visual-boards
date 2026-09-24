@@ -70,3 +70,15 @@ export const ImagesIcon = (p: IconProps) => (
     <circle cx="13" cy="7.5" r="1.2" />
   </Icon>
 );
+export const MoreIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="5" cy="10" r="0.9" fill="currentColor" />
+    <circle cx="10" cy="10" r="0.9" fill="currentColor" />
+    <circle cx="15" cy="10" r="0.9" fill="currentColor" />
+  </Icon>
+);
+export const PlusIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M10 4v12M4 10h12" />
+  </Icon>
+);
